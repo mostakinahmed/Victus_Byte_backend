@@ -133,25 +133,42 @@ const productUpdate = async (req, res) => {
 };
 
 // statusUpdate
+// statusUpdate
 const statusUpdate = async (req, res) => {
-  const { pID, key, value } = req.body;
-  let updated;
-  // key = "isFeatured", value = true/false
-  if (typeof value === "boolean") {
-    updated = await Product.findOneAndUpdate(
-      { pID },
-      { $set: { [`status.${key}`]: value } }, // <-- dynamic field
-      { new: true }
-    );
-  } else if (typeof value === "number") {
-    updated = await Product.findOneAndUpdate(
-      { pID },
-      { $set: { [`price.${key}`]: value } }, // <-- dynamic field
-      { new: true }
-    );
-  }
+  try {
+    const { pID, key, value } = req.body;
 
-  res.json(updated);
+    if (!pID || !key) {
+      return res.status(400).json({ error: "pID and key are required." });
+    }
+
+    let updateField = "";
+
+    if (typeof value === "boolean") {
+      updateField = `status.${key}`;
+    } else if (typeof value === "number") {
+      updateField = `price.${key}`;
+    } else {
+      return res
+        .status(400)
+        .json({ error: "Value must be boolean or number." });
+    }
+
+    const updated = await Product.findOneAndUpdate(
+      { pID },
+      { $set: { [updateField]: value } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Server error." });
+  }
 };
 
 module.exports = {
