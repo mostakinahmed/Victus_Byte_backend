@@ -135,13 +135,21 @@ const productUpdate = async (req, res) => {
 // statusUpdate
 const statusUpdate = async (req, res) => {
   const { pID, key, value } = req.body;
+  let updated;
   // key = "isFeatured", value = true/false
-
-  const updated = await Product.findOneAndUpdate(
-    { pID },
-    { $set: { [`status.${key}`]: value } }, // <-- dynamic field
-    { new: true }
-  );
+  if (typeof value === "boolean") {
+    updated = await Product.findOneAndUpdate(
+      { pID },
+      { $set: { [`status.${key}`]: value } }, // <-- dynamic field
+      { new: true }
+    );
+  } else if (typeof value === "number") {
+    updated = await Product.findOneAndUpdate(
+      { pID },
+      { $set: { [`price.${key}`]: value } }, // <-- dynamic field
+      { new: true }
+    );
+  }
 
   res.json(updated);
 };
