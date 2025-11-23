@@ -132,10 +132,25 @@ const productUpdate = async (req, res) => {
   }
 };
 
+// statusUpdate
+const statusUpdate = async (req, res) => {
+  const { pID, key, value } = req.body;
+  // key = "isFeatured", value = true/false
+
+  const updated = await Product.findOneAndUpdate(
+    { pID },
+    { $set: { [`status.${key}`]: value } }, // <-- dynamic field
+    { new: true }
+  );
+
+  res.json(updated);
+};
+
 module.exports = {
   getAllProducts,
   createProduct,
   stockUpdate,
   deleteProduct,
   productUpdate,
+  statusUpdate,
 };
