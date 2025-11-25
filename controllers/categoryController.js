@@ -79,24 +79,28 @@ const deleteCategory = async (req, res) => {
 };
 
 //for top categories
+//for top categories
 const topCategories = async (req, res) => {
   try {
     const { catID, action } = req.body.data;
 
+    // console.log("Received catID:", catID);
+    // console.log("Received action:", action);
+
     const updated = await category.findOneAndUpdate(
-      { catID },
-      { $set: { topcCategory: action } },
+      { catID: catID }, // match catID
+      { $set: { topCategory: action } }, // field must match schema
       { new: true }
     );
 
     if (!updated) {
-      return res.status(404).json({ error: "cat not found." });
+      return res.status(404).json({ error: "Category not found." });
     }
 
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error("Update error:", error);
-    res.status(500).json({ error: "Server error." });
+    return res.status(500).json({ error: "Server error." });
   }
 };
 
