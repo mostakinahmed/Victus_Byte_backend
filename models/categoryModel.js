@@ -16,7 +16,7 @@ const categorySchema = new mongoose.Schema(
       trim: true,
       maxLength: [100, "Category name cannot exceed 100 characters"],
     },
-
+    topCategory: { type: Boolean, default: false },
     specifications: {
       type: [String],
       default: [],
