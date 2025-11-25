@@ -81,7 +81,7 @@ const deleteCategory = async (req, res) => {
 //for top categories
 const topCategories = async (req, res) => {
   try {
-    const { catID, action } = req.body;
+    const { catID, action } = req.body.data;
 
     const updated = await category.findOneAndUpdate(
       { catID },
@@ -99,6 +99,7 @@ const topCategories = async (req, res) => {
     res.status(500).json({ error: "Server error." });
   }
 };
+
 module.exports = {
   getAllCategories,
   createCategory,
