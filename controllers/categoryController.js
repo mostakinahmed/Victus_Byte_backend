@@ -1,16 +1,6 @@
 const category = require("../models/categoryModel");
 const multer = require("multer");
 
-// GET all categories
-// const getAllCategories = async (req, res) => {
-//   try {
-//     const categories = await category.find(); // MongoDB query
-//     res.json(categories);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
 const getAllCategories = async (req, res) => {
   try {
     const filter = {};
@@ -88,4 +78,30 @@ const deleteCategory = async (req, res) => {
   }
 };
 
-module.exports = { getAllCategories, createCategory, deleteCategory };
+//for top categories
+const topCategories = async (req, res) => {
+  try {
+    const { catID, action } = req.body;
+
+    const updated = await category.findOneAndUpdate(
+      { catID },
+      { $set: { topcCategory: action } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "cat not found." });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Server error." });
+  }
+};
+module.exports = {
+  getAllCategories,
+  createCategory,
+  deleteCategory,
+  topCategories,
+};
