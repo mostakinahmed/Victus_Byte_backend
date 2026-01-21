@@ -14,18 +14,32 @@ const productSchema = new mongoose.Schema(
     category: { type: String },
     images: [{ type: String }],
     description: { type: String },
+
+    // --- NEW FIELDS ADDED ---
+    keywords: [{ type: String }], // For SEO and search accuracy
+    colors: [{ type: String }], // For multiple color variants
+
     status: {
       isFeatured: { type: Boolean, default: false },
       isFlashSale: { type: Boolean, default: false },
       isBestSelling: { type: Boolean, default: false },
       isNewArrival: { type: Boolean, default: false },
     },
+
+    // --- UPDATED SPECIFICATIONS ---
+    // Using a Map allows you to use custom Section Names as keys
     specifications: {
       type: Map,
-      of: [{ key: String, value: String, _id: false }], // prevent _id in subdocs
+      of: [
+        {
+          key: { type: String, required: true },
+          value: { type: String, required: true },
+          _id: false,
+        },
+      ],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Product", productSchema);

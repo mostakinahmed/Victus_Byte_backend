@@ -1,65 +1,46 @@
 require("dotenv").config();
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const app = express();
 const cookieParser = require("cookie-parser");
 
-// Models
-const Product = require("./models/productModel");
-const Category = require("./models/categoryModel");
-const Order = require("./models/orderModel");
-const UserData = require("./models/userDataModel");
-
-// Routes
-const productRoutes = require("./routes/productRoutes");
-const categoryRoutes = require("./routes/categoryRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const userDataRoutes = require("./routes/userDataRoutes");
-const stockRoutes = require("./routes/stockRoutes");
-
-// Database connection
-const db = require("./config/db-connection");
+const app = express();
 
 // Middlewares
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(cors());
 
-//cokie
-// const allowedOrigins = [
-//   "https://react-auth-jwt.vercel.app",
-//   "https://leafxbd.vercel.app",
-//   "https://admin-leapx.vercel.app",
-// ];
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  }),
+);
 
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       if (!origin) return callback(null, true); // allow Postman / curl
-//       if (allowedOrigins.includes(origin)) callback(null, true);
-//       else callback(new Error("Not allowed by CORS"), false);
-//     },
-//     credentials: true, // must be true for cookies
-//   })
-// );
-
-// API routes (after CORS)
-app.use("/api/product", productRoutes);
-app.use("/api/category", categoryRoutes);
-app.use("/api/order", orderRoutes);
-app.use("/api/user", userDataRoutes);
-app.use("/api/stock", stockRoutes);
+// Routes
+app.use("/api/product", require("./routes/productRoutes"));
+app.use("/api/category", require("./routes/categoryRoutes"));
+app.use("/api/order", require("./routes/orderRoutes"));
+app.use("/api/user", require("./routes/userDataRoutes"));
+app.use("/api/stock", require("./routes/stockRoutes"));
 
 // Home route
 app.get("/", (req, res) => {
   res.send("Welcome to Fabribuzz App Backend.....");
 });
 
-// Start server
-app.listen(process.env.PORT, () => {
-  console.log(`✅ Server is running on port ${process.env.PORT}...`);
+// MongoDB Connection (Atlas)
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => {
+    console.error("❌ MongoDB error:", err.message);
+    process.exit(1);
+  });
+
+// Start server (CRITICAL FIX)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });

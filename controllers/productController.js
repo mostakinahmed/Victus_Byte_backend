@@ -22,34 +22,113 @@ const getAllProducts = async (req, res) => {
 // Insert into MongoDB
 
 // CREATE new Product
+// const createProduct = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       brandName,
+//       price,
+//       stock,
+//       category,
+//       images,
+//       description,
+//       specifications,
+//     } = req.body;
+
+//     // Generate new pID
+//     const lastProduct = await Product.findOne().sort({ createdAt: -1 });
+//     let newNumber = 1;
+//     if (lastProduct && lastProduct.pID) {
+//       newNumber = parseInt(lastProduct.pID.slice(1)) + 1;
+//     }
+//     const newID = "P" + String(newNumber).padStart(6, "0");
+//     const sID = "S" + String(newNumber).padStart(6, "0");
+
+//     // Filter specifications
+//     const filteredSpecs = {};
+//     for (const key in specifications) {
+//       const arr = specifications[key];
+//       if (Array.isArray(arr) && arr.length > 0) {
+//         filteredSpecs[key] = arr;
+//       }
+//     }
+
+//     // Create new product
+//     const newProduct = new Product({
+//       pID: newID,
+//       name,
+//       brandName,
+//       price,
+//       stock: sID,
+//       category,
+//       images,
+//       description,
+//       specifications: filteredSpecs,
+//     });
+
+//     const savedProduct = await newProduct.save();
+//     res.status(201).json({
+//       pID: newID,
+//       sID: sID,
+//       message: "Product created successfully",
+//     });
+//   } catch (error) {
+//     res.status(400).json({ message: error.message });
+//   }
+// };
+
 const createProduct = async (req, res) => {
   try {
     const {
       name,
       brandName,
       price,
-      stock,
       category,
       images,
       description,
       specifications,
+      keywords,
+      colors,
     } = req.body;
 
-    // Generate new pID
-    const lastProduct = await Product.findOne().sort({ createdAt: -1 });
-    let newNumber = 1;
-    if (lastProduct && lastProduct.pID) {
-      newNumber = parseInt(lastProduct.pID.slice(1)) + 1;
+    let newID,
+      sID,
+      isUnique = false;
+
+    // --- 100% UNIQUE 6-DIGIT GENERATION LOOP ---
+    while (!isUnique) {
+      // 1. Get last 4 digits of timestamp (changes every millisecond)
+      const ts4 = Date.now().toString().slice(-4);
+
+      // 2. Generate 2 random digits (00 to 99)
+      const rd2 = Math.floor(Math.random() * 90 + 10).toString();
+
+      // 3. Combine them
+      const unique6 = rd2 + ts4;
+
+      newID = "P" + unique6;
+      sID = "S" + unique6;
+
+      // 4. Double check database to guarantee 100% uniqueness
+      const existing = await Product.findOne({ pID: newID });
+      if (!existing) {
+        isUnique = true;
+      }
     }
-    const newID = "P" + String(newNumber).padStart(6, "0");
-    const sID = "S" + String(newNumber).padStart(6, "0");
 
     // Filter specifications
     const filteredSpecs = {};
-    for (const key in specifications) {
-      const arr = specifications[key];
-      if (Array.isArray(arr) && arr.length > 0) {
-        filteredSpecs[key] = arr;
+    if (specifications) {
+      for (const key in specifications) {
+        const arr = specifications[key];
+        if (Array.isArray(arr)) {
+          const validRows = arr.filter(
+            (row) => row.key?.trim() && row.value?.trim(),
+          );
+          if (validRows.length > 0) {
+            filteredSpecs[key] = validRows;
+          }
+        }
       }
     }
 
@@ -61,12 +140,17 @@ const createProduct = async (req, res) => {
       price,
       stock: sID,
       category,
-      images,
+      images: Array.isArray(images)
+        ? images.filter((img) => img.trim() !== "")
+        : [],
       description,
+      keywords: Array.isArray(keywords) ? keywords : [],
+      colors: Array.isArray(colors) ? colors : [],
       specifications: filteredSpecs,
     });
 
-    const savedProduct = await newProduct.save();
+    await newProduct.save();
+
     res.status(201).json({
       pID: newID,
       sID: sID,
@@ -87,7 +171,7 @@ const stockUpdate = async (req, res) => {
     const updated = await Product.findOneAndUpdate(
       { pID: id },
       { stock: stock },
-      { new: true }
+      { new: true },
     );
 
     if (!updated) return res.status(404).json({ message: "Product not found" });
@@ -157,7 +241,7 @@ const statusUpdate = async (req, res) => {
     const updated = await Product.findOneAndUpdate(
       { pID },
       { $set: { [updateField]: value } },
-      { new: true }
+      { new: true },
     );
 
     if (!updated) {

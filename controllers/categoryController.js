@@ -21,7 +21,7 @@ const getAllCategories = async (req, res) => {
 const createCategory = async (req, res) => {
   try {
     // Validate required fields
-    const { catID, catName, specifications } = req.body;
+    const { catID, catName } = req.body;
 
     if (!catID || !catName) {
       return res.status(400).json({
@@ -43,7 +43,6 @@ const createCategory = async (req, res) => {
     const newCategory = new category({
       catID,
       catName,
-      specifications: specifications || [],
     });
 
     const savedCategory = await newCategory.save();
