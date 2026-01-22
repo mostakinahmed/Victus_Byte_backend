@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get("/", getAllOrder);
 router.post("/create-order", upload.none(), createOrder);
-router.patch("/update/:oID", orderUpdate);
+router.patch("/update/:orderId", orderUpdate);
 router.patch("/status/:id", orderStatusChanged);
 
 module.exports = router;

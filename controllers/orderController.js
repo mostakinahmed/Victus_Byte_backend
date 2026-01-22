@@ -42,7 +42,7 @@ const orderStatusChanged = async (req, res) => {
     const updatedOrder = await order.findOneAndUpdate(
       { OID: id },
       { orderStatus: status },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedOrder) {
@@ -59,42 +59,60 @@ const orderStatusChanged = async (req, res) => {
 // PATCH /orders/:orderId
 const orderUpdate = async (req, res) => {
   try {
-    const { oID } = req.params;
-    const updates = req.body; // frontend sends only changed fields
+    // Ensure route param matches
+    const { orderId } = req.params;
+    const updates = req.body;
 
-    // Fetch the order
-    const orderData = await order.findOne({ order_id: oID });
+    console.log("Received orderId:", orderId);
+    console.log("Received updates:", updates);
+
+    if (!orderId) {
+      return res
+        .status(400)
+        .json({ message: "Order ID is required in params" });
+    }
+
+    // Find order by correct DB field (replace 'order_id' if your field is different)
+    const orderData = await order.findOne({ order_id: orderId });
     if (!orderData) {
       return res.status(404).json({ message: "Order not found" });
     }
 
     // Update payment status if provided
-    if (updates.payment && updates.payment.status) {
+    if (updates.payment?.status) {
       orderData.payment.status = updates.payment.status;
     }
 
-    // Update order status if provided
+    // 4️⃣ Update order status if provided
     if (updates.status) {
       orderData.status = updates.status;
     }
 
-    // Update item SKU(s) if provided
+    // Update items (SKU & IMEI)
     if (updates.items && Array.isArray(updates.items)) {
       updates.items.forEach((itemUpdate) => {
         const item = orderData.items.find(
-          (i) => i.product_id === itemUpdate.product_id
+          (i) => i.product_id === itemUpdate.product_id,
         );
-        if (item && itemUpdate.skuID !== undefined) {
-          item.skuID = itemUpdate.skuID;
+
+        if (!item) return;
+
+        // Update SKU
+        if (itemUpdate.skuID !== undefined) item.skuID = itemUpdate.skuID;
+
+        // Update IMEI (single string)
+        if (itemUpdate.imei !== undefined) {
+          item.imei = itemUpdate.imei; // just store the string directly
         }
       });
     }
 
+    // Save the updated order
     await orderData.save();
 
-    res.status(200).json({ message: "Order updated", orderData });
+    res.status(200).json({ message: "Order updated successfully", orderData });
   } catch (error) {
-    console.error(error);
+    console.error("Order update error:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
