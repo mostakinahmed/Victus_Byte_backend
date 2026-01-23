@@ -52,7 +52,7 @@ const signUp = async (req, res) => {
     const tokenLast = jwt.sign(
       { email: savedUser.email, id: savedUser.uID },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "2h" },
     );
 
     // Send cookie
@@ -225,7 +225,7 @@ const adminSignIn = async (req, res) => {
     const token = jwt.sign(
       { email: user.email, id: user.adminID },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "2h" },
     );
 
     //saved login time
@@ -271,8 +271,13 @@ const adminCheckAuth = async (req, res) => {
 // Get all Admins
 const adminList = async (req, res) => {
   try {
-    const users = await AdminData.find();
-    res.json(users);
+    // Select only adminID and name (space separated)
+    // The -_id excludes the default MongoDB ID if you don't need it
+    const admins = await AdminData.find().select(
+      "adminID fullName userName -_id",
+    );
+
+    res.status(200).json(admins);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -299,7 +304,7 @@ const signIn = async (req, res) => {
     const token = jwt.sign(
       { email: user.email, id: user.uID },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "2h" },
     );
 
     // Send successful response
