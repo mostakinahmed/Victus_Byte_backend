@@ -1,6 +1,61 @@
 const order = require("../models/orderModel");
 const multer = require("multer");
+const axios = require("axios");
 
+//------balance check api
+// Function to check BulkSmsBD balance
+const getSmsBalance = async (req, res) => {
+  try {
+    const apiKey = process.env.BULKSMS_API_KEY?.trim();
+
+    // We use the EXACT URL format that you proved works in the browser
+    const url = `http://bulksmsbd.net/api/getBalanceApi?api_key=${apiKey}`;
+
+    const response = await axios.get(url);
+    // Send the data back to your Admin Panel
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("❌ Balance Fetch Error:", error.message);
+    res.status(500).json({
+      message: "Failed to fetch balance",
+      error: error.message,
+    });
+  }
+};
+
+//sms
+const sendOrderSms = async (customerPhone, orderId) => {
+  try {
+    let cleanNumber = customerPhone.replace(/\D/g, "");
+    if (cleanNumber.startsWith("88")) cleanNumber = cleanNumber.substring(2);
+
+    const message = `Victus Byte: Order #${orderId} is received!
+Track: victusbyte.com/track-order
+Hotline: 09611-342936
+Stay with us, Thank you.`;
+
+    // Capture the response in a variable
+    const response = await axios.get("http://bulksmsbd.net/api/smsapi", {
+      params: {
+        api_key: process.env.BULKSMS_API_KEY,
+        type: "text",
+        number: cleanNumber,
+        senderid: process.env.BULKSMS_SENDER_ID,
+        message: message,
+      },
+    });
+
+    // THIS IS THE PROOF: Log this to your terminal
+    console.log("--- BulkSmsBD Response Trace ---");
+    console.log("Status Code:", response.status);
+    console.log("API Response Body:", response.data);
+    console.log("--------------------------------");
+  } catch (error) {
+    console.error("❌ Network/Axios Error:", error.message);
+  }
+};
+
+//all the order list
 const getAllOrder = async (req, res) => {
   try {
     const filter = {};
@@ -23,6 +78,9 @@ const createOrder = async (req, res) => {
   try {
     const newOrder = new order(req.body); // Data from request
     const savedProduct = await newOrder.save();
+
+    //sms funciton
+    sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
 
     res.status(201).json(savedProduct);
   } catch (error) {
@@ -122,4 +180,5 @@ module.exports = {
   getAllOrder,
   orderStatusChanged,
   orderUpdate,
+  getSmsBalance,
 };
