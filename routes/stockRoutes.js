@@ -3,6 +3,7 @@ const {
   getAllStock,
   createStock,
   addStock,
+  getAllStockClient,
 } = require("../controllers/stockController");
 
 const multer = require("multer");
@@ -14,4 +15,6 @@ router.get("/", authorize(["45", "15"]), getAllStock);
 router.post("/create-stock", authorize(["45", "15"]), createStock);
 router.post("/add-stock", authorize(["45", "15"]), addStock);
 
+//public api
+router.get("/client", getAllStockClient);
 module.exports = router;
