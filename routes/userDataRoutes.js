@@ -10,17 +10,14 @@ const {
 const multer = require("multer");
 const upload = multer();
 const router = express.Router();
+const { authorize } = require("../middlewares/apiMiddleware.js");
 
-// router.get("/", getAllUser);
-// router.post("/signup", signUp);
-// router.post("/signin", signIn);
-// router.post("/check-auth", checkAuth);
 
 // Admin routes can be added here in the future
-router.post("/admin/signup", adminSignUp);
+router.post("/admin/signup", authorize(["45"]), adminSignUp);
 router.post("/admin/signin", adminSignIn);
 router.post("/admin/check-auth", adminCheckAuth);
-router.get("/admin/list", adminList);
-router.put("/admin/update/:id", adminUpdate);
+router.get("/admin/list", authorize(["45", "15"]), adminList);
+router.put("/admin/update/:id", authorize(["45"]), adminUpdate);
 
 module.exports = router;

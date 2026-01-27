@@ -78,18 +78,14 @@ const deleteCategory = async (req, res) => {
 };
 
 //for top categories
-//for top categories
 const topCategories = async (req, res) => {
   try {
-    const { catID, action } = req.body.data;
-
-    // console.log("Received catID:", catID);
-    // console.log("Received action:", action);
+    const { catID, action } = req.body;
 
     const updated = await category.findOneAndUpdate(
       { catID: catID }, // match catID
       { $set: { topCategory: action } }, // field must match schema
-      { new: true }
+      { new: true },
     );
 
     if (!updated) {
@@ -103,9 +99,28 @@ const topCategories = async (req, res) => {
   }
 };
 
+// public api for client
+
+const getAllCategoriesClient = async (req, res) => {
+  try {
+    const filter = {};
+
+    // If query param exists, filter by catID
+    if (req.query.catID) {
+      filter.catID = req.query.catID; // e.g., "C001"
+    }
+
+    const categories = await category.find(filter);
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAllCategories,
   createCategory,
+  getAllCategoriesClient,
   deleteCategory,
   topCategories,
 };

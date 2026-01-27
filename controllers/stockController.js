@@ -44,21 +44,6 @@ const createStock = async (req, res) => {
   }
 };
 
-//Delete Category
-// const deleteCategory = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const deletedCat = await category.findByIdAndDelete(id);
-
-//     if (!deletedCat)
-//       return res.status(404).json({ message: "Product not found" });
-
-//     res.status(200).json(deletedCat);
-//   } catch (err) {
-//     res.status(400).json({ message: err.message });
-//   }
-// };
-
 // Add New Stock in a existing product
 const addStock = async (req, res) => {
   try {
@@ -97,7 +82,5 @@ const addStock = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
-
-module.exports = { addStock };
 
 module.exports = { getAllStock, createStock, addStock };

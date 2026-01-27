@@ -49,28 +49,6 @@ const adminSignUp = async (req, res) => {
     });
 
     const savedUser = await newUser.save();
-    // console.log("Admin user saved:", savedUser);
-    // // Hide password before sending to frontend
-    // const userToSend = savedUser.toObject();
-    // delete userToSend.password;
-
-    // // Create JWT token
-    // const tokenLast = jwt.sign(
-    //   { email: savedUser.email, id: savedUser.uID },
-    //   process.env.JWT_SECRET,
-    //   { expiresIn: "2h" }
-    // );
-
-    // Send cookie
-    // const isProduction = process.env.NODE_ENV === "production";
-
-    // res.cookie("token111", tokenLast, {
-    //   httpOnly: true, // cannot be accessed by JS
-    //   secure: isProduction, // true on HTTPS (Vercel), false on local dev
-    //   sameSite: isProduction ? "None" : "Lax", // None for cross-origin in production
-    //   path: "/",
-    //   maxAge: 2 * 60 * 60 * 1000, // 2 hours
-    // });
 
     // Send response
     res.status(201).json({
@@ -161,11 +139,28 @@ const adminSignIn = async (req, res) => {
       return res.status(401).json({ message: "Incorrect password" });
     }
 
-    //Create JWT token
+    // //Create JWT token
+    // const token = jwt.sign(
+    //   { email: user.email, id: user.adminID },
+    //   process.env.JWT_SECRET,
+    //   { expiresIn: "2h" },
+    // );
+
+    // 4. Role Extraction Logic (The 45/15 Logic)
+    // We determine the role based on the ID prefix
+    const idPrefix = user.adminID.substring(0, 2);
+    const role =
+      idPrefix === "45" ? "admin" : idPrefix === "15" ? "employee" : "guest";
+
+    // 5. Create JWT (Include role in payload)
     const token = jwt.sign(
-      { email: user.email, id: user.adminID },
+      {
+        email: user.email,
+        id: user.adminID,
+        role: role, // Baking the role into the token
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" },
+      { expiresIn: "8h" }, // Extended to a full workday
     );
 
     //saved login time

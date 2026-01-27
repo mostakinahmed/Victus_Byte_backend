@@ -44,12 +44,6 @@ Stay with us, Thank you.`;
         message: message,
       },
     });
-
-    // THIS IS THE PROOF: Log this to your terminal
-    console.log("--- BulkSmsBD Response Trace ---");
-    console.log("Status Code:", response.status);
-    console.log("API Response Body:", response.data);
-    console.log("--------------------------------");
   } catch (error) {
     console.error("❌ Network/Axios Error:", error.message);
   }
@@ -87,32 +81,6 @@ const createOrder = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
-// PATCH /api/order/status/:id
-const orderStatusChanged = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      return res.status(400).json({ message: "Status is required" });
-    }
-
-    const updatedOrder = await order.findOneAndUpdate(
-      { OID: id },
-      { orderStatus: status },
-      { new: true },
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    res.status(200).json(updatedOrder);
-  } catch (err) {
-    console.error("Error updating order status:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
 
 // PATCH /orders/:orderId
 const orderUpdate = async (req, res) => {
@@ -120,9 +88,6 @@ const orderUpdate = async (req, res) => {
     // Ensure route param matches
     const { orderId } = req.params;
     const updates = req.body;
-
-    console.log("Received orderId:", orderId);
-    console.log("Received updates:", updates);
 
     if (!orderId) {
       return res
@@ -178,7 +143,6 @@ const orderUpdate = async (req, res) => {
 module.exports = {
   createOrder,
   getAllOrder,
-  orderStatusChanged,
   orderUpdate,
   getSmsBalance,
 };
