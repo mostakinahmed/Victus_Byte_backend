@@ -24,6 +24,7 @@ app.use("/api/category", require("./routes/categoryRoutes"));
 app.use("/api/order", require("./routes/orderRoutes"));
 app.use("/api/user", require("./routes/userDataRoutes"));
 app.use("/api/stock", require("./routes/stockRoutes"));
+app.use("/api/coupon", require("./routes/couponRoutes"));
 
 // Home route
 app.get("/", (req, res) => {

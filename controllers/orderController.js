@@ -1,6 +1,21 @@
 const order = require("../models/orderModel");
-const multer = require("multer");
+const products = require("../models/productModel");
 const axios = require("axios");
+
+const coupon1 = [
+  {
+    id: "VICTUS10",
+    value: 100,
+  },
+  {
+    id: "VICTUS50",
+    value: 50,
+  },
+  {
+    id: "VICTUS10",
+    value: 100,
+  },
+];
 
 //------balance check api
 // Function to check BulkSmsBD balance
@@ -82,6 +97,96 @@ const createOrder = async (req, res) => {
   }
 };
 
+// CREATE new Order for client
+const createOrderClient = async (req, res) => {
+  try {
+    // 1. Get client data (In production, replace dummyOrderPayload with req.body)
+    const clientOrder = req.body;
+
+    // 2. Extract IDs and quantities for DB verification
+    const pid = clientOrder.items.map((item) => ({
+      id: item.product_id,
+      qty: item.quantity,
+    }));
+
+    // 3. IMPORTANT: Wait for the DB to calculate the real values
+    const dbData = await varifyOrder(pid);
+
+    // 4. THE TRIPLE CHECK (The Final Lock)
+    const isSubtotalMatch =
+      Math.round(clientOrder.subtotal) === Math.round(dbData.subtotal);
+    const isDiscountMatch =
+      Math.round(clientOrder.discount) === Math.round(dbData.totalDiscount);
+
+    // Total Amount Check: (Subtotal - Discount) + Shipping - Coupon
+    const expectedTotal =
+      dbData.subtotal -
+      dbData.totalDiscount +
+      clientOrder.shipping_cost -
+      clientOrder.coupon;
+
+    const isTotalAmountMatch =
+      Math.round(clientOrder.total_amount) === Math.round(expectedTotal);
+
+    if (isSubtotalMatch && isDiscountMatch && isTotalAmountMatch) {
+      // 5. Success! Now we save to MongoDB
+      const newOrder = new order(clientOrder);
+      const savedProduct = await newOrder.save();
+
+      // Send SMS
+      sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
+
+      // How to access the values:
+      // console.log("Subtotal:", dbData.subtotal);
+      // console.log("Total Savings:", dbData.totalDiscount);
+      // console.log("Total Savings:", expectedTotal);
+
+      res.status(201).json({ success: true, data: savedProduct });
+    } else {
+      // How to access the values:
+      // console.log("Subtotal:", dbData.subtotal);
+      // console.log("Total Savings:", dbData.totalDiscount);
+      // console.log("Total Savings:", expectedTotal);
+      // If any of the three checks fail, we block the order
+      res.status(400).json({
+        success: false,
+        message:
+          "Security Alert: Order verification failed. Price or Discount mismatch!",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// varify price request
+const varifyOrder = async (pid) => {
+  // Initialize our "Source of Truth" object
+  let orderSummary = {
+    subtotal: 0,
+    totalDiscount: 0,
+    total_amount: 0,
+  };
+
+  // 1. Loop through each item in the order
+  for (const item of pid) {
+    // 2. Fetch REAL data from MongoDB (wait for the handshake)
+    const pData = await products.findOne({ pID: item.id });
+    console.log(products);
+
+    if (pData) {
+      // 3. Calculate the discount for this item
+      const itemDiscountTotal = (pData.price.discount || 0) * item.qty;
+      const itemSellingTotal = pData.price.selling * item.qty;
+
+      // 4. Update the totals
+      orderSummary.subtotal += itemSellingTotal;
+      orderSummary.totalDiscount += itemDiscountTotal;
+    }
+  }
+
+  return orderSummary;
+};
 // PATCH /orders/:orderId
 const orderUpdate = async (req, res) => {
   try {
@@ -145,4 +250,5 @@ module.exports = {
   getAllOrder,
   orderUpdate,
   getSmsBalance,
+  createOrderClient,
 };
