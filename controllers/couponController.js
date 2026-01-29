@@ -7,14 +7,16 @@ const createCoupon = async (req, res) => {
 
     const existing = await Coupon.findOne({ couponID: couponID.toUpperCase() });
     if (existing) {
-      return res.status(400).json({ success: false, message: "Coupon code already exists" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Coupon code already exists" });
     }
 
     const newCoupon = new Coupon({
       couponID: couponID.toUpperCase(),
       value,
       minTK,
-      status: status !== undefined ? status : true // Defaults to active
+      status: status !== undefined ? status : true, // Defaults to active
     });
 
     const savedCoupon = await newCoupon.save();
@@ -38,9 +40,10 @@ const getAllCoupon = async (req, res) => {
 const getAllCouponClient = async (req, res) => {
   try {
     // -_id removes the MongoDB ID from the response for cleaner data
-    const coupons = await Coupon.find({ status: true })
-      .select("couponID  -_id");
-      
+    const coupons = await Coupon.find({ status: true }).select(
+      "couponID value minTK -_id",
+    );
+
     res.status(200).json({ success: true, data: coupons });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -54,16 +57,18 @@ const toggleCouponStatus = async (req, res) => {
     const coupon = await Coupon.findById(id);
 
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Coupon not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Coupon not found" });
     }
 
     coupon.status = !coupon.status;
     await coupon.save();
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: `Coupon is now ${coupon.status ? "Active" : "Deactivated"}`,
-      status: coupon.status 
+      status: coupon.status,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -77,10 +82,14 @@ const deleteCoupon = async (req, res) => {
     const deleted = await Coupon.findByIdAndDelete(id);
 
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Coupon not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Coupon not found" });
     }
 
-    res.status(200).json({ success: true, message: "Coupon deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Coupon deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

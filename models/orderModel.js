@@ -38,7 +38,7 @@ const ShippingAddressSchema = new mongoose.Schema(
 const OrderSchema = new mongoose.Schema({
   order_id: { type: String, required: true, unique: true },
   order_date: { type: String, required: true },
-
+  coupon: { type: Object, default: null },
   mode: { type: String, required: true },
   customer_id: { type: String, default: "" },
   items: { type: [OrderItemSchema], required: true },

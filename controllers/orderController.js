@@ -2,21 +2,6 @@ const order = require("../models/orderModel");
 const products = require("../models/productModel");
 const axios = require("axios");
 
-const coupon1 = [
-  {
-    id: "VICTUS10",
-    value: 100,
-  },
-  {
-    id: "VICTUS50",
-    value: 50,
-  },
-  {
-    id: "VICTUS10",
-    value: 100,
-  },
-];
-
 //------balance check api
 // Function to check BulkSmsBD balance
 const getSmsBalance = async (req, res) => {
@@ -118,12 +103,16 @@ const createOrderClient = async (req, res) => {
     const isDiscountMatch =
       Math.round(clientOrder.discount) === Math.round(dbData.totalDiscount);
 
-    // Total Amount Check: (Subtotal - Discount) + Shipping - Coupon
+    //  Total Amount Check: (Subtotal - Discount) + Shipping - Coupon
+    // Total Amount Check: (Subtotal - Discount) + Shipping
     const expectedTotal =
-      dbData.subtotal -
-      dbData.totalDiscount +
-      clientOrder.shipping_cost -
-      clientOrder.coupon;
+      dbData.subtotal - dbData.totalDiscount + clientOrder.shipping_cost;
+
+    // const expectedTotal =
+    //   dbData.subtotal -
+    //   dbData.totalDiscount +
+    //   clientOrder.shipping_cost -
+    //   clientOrder.coupon;
 
     const isTotalAmountMatch =
       Math.round(clientOrder.total_amount) === Math.round(expectedTotal);
@@ -137,9 +126,9 @@ const createOrderClient = async (req, res) => {
       sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
 
       // How to access the values:
-      // console.log("Subtotal:", dbData.subtotal);
-      // console.log("Total Savings:", dbData.totalDiscount);
-      // console.log("Total Savings:", expectedTotal);
+      console.log("Subtotal:", dbData.subtotal);
+      console.log("Total Savings:", dbData.totalDiscount);
+      console.log("Total Savings:", expectedTotal);
 
       res.status(201).json({ success: true, data: savedProduct });
     } else {
