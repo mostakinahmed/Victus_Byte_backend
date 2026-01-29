@@ -1,5 +1,6 @@
 const order = require("../models/orderModel");
 const products = require("../models/productModel");
+const coupons = require("../models/couponModel");
 const axios = require("axios");
 
 //------balance check api
@@ -67,7 +68,7 @@ const getAllOrder = async (req, res) => {
 };
 
 // Insert into MongoDB
-// CREATE new Order
+67; // CREATE new Order
 const createOrder = async (req, res) => {
   try {
     const newOrder = new order(req.body); // Data from request
@@ -97,22 +98,51 @@ const createOrderClient = async (req, res) => {
     // 3. IMPORTANT: Wait for the DB to calculate the real values
     const dbData = await varifyOrder(pid);
 
+    //coupon check
+    // 1. Check if a coupon object exists in the request
+    let verifiedCouponValue = 0;
+    if (clientOrder.coupon && clientOrder.coupon.couponID) {
+      // 2. Find the coupon in your database to verify it's real and active
+      const dbCoupon = await coupons.findOne({
+        couponID: clientOrder.coupon.couponID.toUpperCase(),
+        status: true,
+      });
+
+      if (!dbCoupon) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid or expired coupon code." });
+      }
+
+      // 3. Triple Check: Verify the subtotal meets the minTK requirement on the SERVER side
+      if (clientOrder.subtotal < dbCoupon.minTK) {
+        return res.status(400).json({
+          success: false,
+          message: `Minimum purchase of ৳${dbCoupon.minTK} required for this coupon.`,
+        });
+      }
+
+      // 4. Verification: Ensure the discount value sent by client matches the DB value
+      if (clientOrder.coupon.value !== dbCoupon.value) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Coupon value mismatch detected." });
+      }
+
+      verifiedCouponValue = dbCoupon.value;
+      //valid coupon true code
+    }
     // 4. THE TRIPLE CHECK (The Final Lock)
     const isSubtotalMatch =
       Math.round(clientOrder.subtotal) === Math.round(dbData.subtotal);
     const isDiscountMatch =
       Math.round(clientOrder.discount) === Math.round(dbData.totalDiscount);
 
-    //  Total Amount Check: (Subtotal - Discount) + Shipping - Coupon
-    // Total Amount Check: (Subtotal - Discount) + Shipping
     const expectedTotal =
-      dbData.subtotal - dbData.totalDiscount + clientOrder.shipping_cost;
-
-    // const expectedTotal =
-    //   dbData.subtotal -
-    //   dbData.totalDiscount +
-    //   clientOrder.shipping_cost -
-    //   clientOrder.coupon;
+      dbData.subtotal -
+      dbData.totalDiscount +
+      clientOrder.shipping_cost -
+      verifiedCouponValue;
 
     const isTotalAmountMatch =
       Math.round(clientOrder.total_amount) === Math.round(expectedTotal);
@@ -126,17 +156,12 @@ const createOrderClient = async (req, res) => {
       sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
 
       // How to access the values:
-      console.log("Subtotal:", dbData.subtotal);
-      console.log("Total Savings:", dbData.totalDiscount);
-      console.log("Total Savings:", expectedTotal);
-
-      res.status(201).json({ success: true, data: savedProduct });
-    } else {
-      // How to access the values:
       // console.log("Subtotal:", dbData.subtotal);
       // console.log("Total Savings:", dbData.totalDiscount);
       // console.log("Total Savings:", expectedTotal);
-      // If any of the three checks fail, we block the order
+
+      res.status(201).json({ success: true, data: savedProduct });
+    } else {
       res.status(400).json({
         success: false,
         message:
@@ -154,14 +179,13 @@ const varifyOrder = async (pid) => {
   let orderSummary = {
     subtotal: 0,
     totalDiscount: 0,
-    total_amount: 0,
   };
 
   // 1. Loop through each item in the order
   for (const item of pid) {
     // 2. Fetch REAL data from MongoDB (wait for the handshake)
     const pData = await products.findOne({ pID: item.id });
-    console.log(products);
+   
 
     if (pData) {
       // 3. Calculate the discount for this item
