@@ -130,7 +130,7 @@ const createOrderClient = async (req, res) => {
       }
 
       verifiedCouponValue = dbCoupon.value;
-      //valid coupon true code
+     
     }
     // 4. THE TRIPLE CHECK (The Final Lock)
     const isSubtotalMatch =
@@ -154,11 +154,6 @@ const createOrderClient = async (req, res) => {
 
       // Send SMS
       sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
-
-      // How to access the values:
-      // console.log("Subtotal:", dbData.subtotal);
-      // console.log("Total Savings:", dbData.totalDiscount);
-      // console.log("Total Savings:", expectedTotal);
 
       res.status(201).json({ success: true, data: savedProduct });
     } else {
