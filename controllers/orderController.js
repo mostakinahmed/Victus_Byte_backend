@@ -36,7 +36,7 @@ Hotline: 09611-342936
 Stay with us, Thank you.`;
 
     // Capture the response in a variable
-    const response = await axios.get("http://bulksmsbd.net/api/smsapi", {
+    const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
       params: {
         api_key: process.env.BULKSMS_API_KEY,
         type: "text",
@@ -45,6 +45,7 @@ Stay with us, Thank you.`;
         message: message,
       },
     });
+
   } catch (error) {
     console.error("❌ Network/Axios Error:", error.message);
   }
@@ -130,7 +131,6 @@ const createOrderClient = async (req, res) => {
       }
 
       verifiedCouponValue = dbCoupon.value;
-     
     }
     // 4. THE TRIPLE CHECK (The Final Lock)
     const isSubtotalMatch =
@@ -180,7 +180,6 @@ const varifyOrder = async (pid) => {
   for (const item of pid) {
     // 2. Fetch REAL data from MongoDB (wait for the handshake)
     const pData = await products.findOne({ pID: item.id });
-   
 
     if (pData) {
       // 3. Calculate the discount for this item
