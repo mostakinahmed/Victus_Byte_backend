@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.get("/", authorize(["45", "15"]), getAllProducts);
 router.post("/", upload.none(), authorize(["45", "15"]), createProduct);
-router.patch("/", authorize(["45", "15"]), statusUpdate);
+router.post("/status", authorize(["45", "15"]), statusUpdate);
 
 //public route
 router.get("/client", getAllProductsClient);

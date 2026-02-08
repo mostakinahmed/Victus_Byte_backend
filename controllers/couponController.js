@@ -51,27 +51,63 @@ const getAllCouponClient = async (req, res) => {
 };
 
 // 4. UPDATE: Toggle Active/Deactive status (Admin)
+// const toggleCouponStatus = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const coupon = await Coupon.findById(id);
+
+//     if (!coupon) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Coupon not found" });
+//     }
+
+//     coupon.status = !coupon.status;
+//     await coupon.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: `Coupon is now ${coupon.status ? "Active" : "Deactivated"}`,
+//       status: coupon.status,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+// Toggle Coupon Status (Active/Deactive)
 const toggleCouponStatus = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 1. Find the coupon first to get its current status
     const coupon = await Coupon.findById(id);
 
     if (!coupon) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Coupon not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Coupon not found",
+      });
     }
 
+    // 2. Toggle the boolean value
     coupon.status = !coupon.status;
+
+    // 3. Save the updated document
     await coupon.save();
 
+    // 4. Send the response back to your React frontend
     res.status(200).json({
       success: true,
       message: `Coupon is now ${coupon.status ? "Active" : "Deactivated"}`,
-      status: coupon.status,
+      data: coupon, // Sending the whole object helps React update state easily
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Toggle Error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error while toggling status",
+    });
   }
 };
 

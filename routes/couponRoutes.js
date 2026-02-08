@@ -20,7 +20,7 @@ router.get("/admin/all", getAllCoupon);
 router.post("/create", createCoupon);
 
 // 4. ADMIN: Toggle Active/Deactive (Use PATCH for updates)
-router.patch("/toggle/:id", toggleCouponStatus);
+router.post("/toggle/:id", toggleCouponStatus);
 
 // 5. ADMIN: Delete
 router.delete("/delete/:id", deleteCoupon);
