@@ -11,16 +11,20 @@ const allowedOrigins = [
   "https://admin.victusbyte.com",
   "https://admin.victusbyte.top",
   "https://victusbyte.com",
+  "https://www.victusbyte.com", // <--- ADD THIS ONE
   "http://localhost:5173",
+  "https://victusbyte.vercel.app",
 ];
 
 // This single block handles both regular requests AND preflights
-app.use(cors({
-  origin: allowedOrigins,
-  methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    credentials: true,
+    optionsSuccessStatus: 200,
+  }),
+);
 
 // --- 3. STANDARD MIDDLEWARES ---
 app.use(express.json());
