@@ -20,29 +20,32 @@ const getAllCategories = async (req, res) => {
 // CREATE new category
 const createCategory = async (req, res) => {
   try {
-    // Validate required fields
-    const { catID, catName } = req.body;
+    // 1. Destructure only the relevant fields
+    const { catID, catName, catIcon } = req.body;
 
-    if (!catID || !catName) {
+    // 2. Strict validation for the new structure
+    if (!catID || !catName || !catIcon) {
       return res.status(400).json({
         success: false,
-        message: "catID and catName are required.",
+        message:
+          "Missing required fields: catID, catName, and catIcon are all mandatory.",
       });
     }
 
-    // Check for duplicate category ID
+    // Check for duplicate category ID to avoid MongoDB errors
     const existingCategory = await category.findOne({ catID });
     if (existingCategory) {
       return res.status(409).json({
         success: false,
-        message: `Category with ID '${catID}' already exists.`,
+        message: `Category ID '${catID}' is already in use.`,
       });
     }
 
-    // Create and save new category
+    // 3. Create the instance with the icon
     const newCategory = new category({
       catID,
       catName,
+      catIcon, // Storing the icon string (e.g., "FiLaptop")
     });
 
     const savedCategory = await newCategory.save();
@@ -61,7 +64,6 @@ const createCategory = async (req, res) => {
     });
   }
 };
-
 //Delete Category
 const deleteCategory = async (req, res) => {
   try {

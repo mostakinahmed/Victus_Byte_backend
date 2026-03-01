@@ -16,12 +16,24 @@ const categorySchema = new mongoose.Schema(
       trim: true,
       maxLength: [100, "Category name cannot exceed 100 characters"],
     },
-    topCategory: { type: Boolean, default: false },
+
+    // --- NEW ICON FIELD ---
+    catIcon: {
+      type: String,
+      required: [true, "Please select an icon for this category"],
+      default: "FiBox", // Standard default icon
+      trim: true,
+    },
+
+    topCategory: { 
+      type: Boolean, 
+      default: false 
+    },
   },
   {
-    timestamps: true, // automatically adds createdAt and updatedAt fields
-    versionKey: false, // hides __v field
-  },
+    timestamps: true, 
+    versionKey: false, 
+  }
 );
 
 module.exports = mongoose.model("Category", categorySchema);
