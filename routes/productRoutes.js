@@ -4,6 +4,7 @@ const {
   getAllProducts,
   getAllProductsClient,
   statusUpdate,
+  updateProduct,
 } = require("../controllers/productController");
 const { authorize } = require("../middlewares/apiMiddleware.js");
 
@@ -14,6 +15,7 @@ const router = express.Router();
 router.get("/", authorize(["45", "15"]), getAllProducts);
 router.post("/", upload.none(), authorize(["45", "15"]), createProduct);
 router.post("/status", authorize(["45", "15"]), statusUpdate);
+router.post("/update/:pID", authorize(["45", "15"]), updateProduct);
 
 //public route
 router.get("/client", getAllProductsClient);

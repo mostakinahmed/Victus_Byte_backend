@@ -157,9 +157,40 @@ const getAllProductsClient = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+//product update
+const updateProduct = async (req, res) => {
+  const { pID } = req.params;
+  const updateData = req.body;
+
+  try {
+    // Find by your custom pID and apply the new data
+    const updatedProduct = await Product.findOneAndUpdate(
+      { pID: pID },
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
+
+    if (!updatedProduct) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Updated successfully",
+      data: updatedProduct,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getAllProducts,
   createProduct,
   statusUpdate,
   getAllProductsClient,
+  updateProduct,
 };
