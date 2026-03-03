@@ -7,6 +7,8 @@ const {
   customerUpdate,
   logout,
   getProfile,
+  resetPassword,
+  forgotPasswordSearch,
 } = require("../controllers/customerDataController.js");
 const { protect } = require("../middlewares/authMiddleware.js");
 
@@ -20,6 +22,8 @@ router.post("/varify-otp", varifyOTP);
 router.get("/list", customerList);
 router.put("/update/:id", customerUpdate);
 router.post("/logout", logout);
+router.post("/forgot-password-search", forgotPasswordSearch);
+router.post("/reset-password", resetPassword);
 
 router.get("/profile", protect, getProfile);
 

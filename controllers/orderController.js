@@ -45,7 +45,23 @@ Stay with us, Thank you.`;
         message: message,
       },
     });
+    // ADD THIS LINE TO SEE THE REAL DATA IN TERMINAL
+    console.log("RAW GATEWAY DATA:", response.data);
+    const statusCode = response.data.status_code;
 
+    if (statusCode === 202) {
+      console.log("✅ SMS Sent Successfully to:", formattedPhone);
+    } else {
+      console.error(
+        `❌ SMS Failed. Error Code ${statusCode}: ${response.data.message}`,
+      );
+
+      if (statusCode === 1032) {
+        console.log(
+          "👉 ACTION REQUIRED: Whitelist your HostSeba IP in ForBulkSMS panel.",
+        );
+      }
+    }
   } catch (error) {
     console.error("❌ Network/Axios Error:", error.message);
   }
