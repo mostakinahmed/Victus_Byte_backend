@@ -43,14 +43,22 @@ const createTokenAndSetCookie = (user, res) => {
     expiresIn: "7d",
   });
 
-  // 3. SET THE COOKIE (Using your exact settings)
+  //3. SET THE COOKIE (Using your exact settings)
   res.cookie("_v_bid", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    secure: true,
+    sameSite: "None",
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Days
   });
+
+  // res.cookie("_v_bid", token, {
+  //   httpOnly: true,
+  //   secure: true,
+  //   sameSite: "Lax",
+  //   path: "/",
+  //   maxAge: 7 * 24 * 60 * 60 * 1000,
+  // });
 
   return token;
 };
@@ -106,7 +114,7 @@ const customerSignUp = async (req, res) => {
     }
 
     // 3. SMS Integration (Placeholder)
-    sendOrderSms(phone, generatedOtp);
+    // sendOrderSms(phone, generatedOtp);
 
     res.status(200).json({
       success: true,
@@ -273,7 +281,7 @@ const forgotPasswordSearch = async (req, res) => {
     await user.save();
 
     // 4. Send SMS (Integrate your ForBulkSMS or other gateway here)
-    // await sendSMS(phone, `Your Victus Byte password reset code is: ${otp}`);
+    // sendOrderSms(phone,otp);
 
     res.status(200).json({
       success: true,
