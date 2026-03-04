@@ -300,7 +300,6 @@ const forgotPasswordSearch = async (req, res) => {
 };
 
 //reset password
-//reset password
 const resetPassword = async (req, res) => {
   try {
     const { phone, password } = req.body;
@@ -340,102 +339,39 @@ const resetPassword = async (req, res) => {
 const customerList = () => {};
 
 //edit profile
-// const customerUpdate = async (req, res) => {
-//   const { userName, email, gender } = req.body;
-
-//   try {
-//     const userId = req.user._id;
-
-//     // 2. Perform the update
-//     const updatedUser = await Customer.findByIdAndUpdate(
-//       userId,
-//       {
-//         userName,
-//         email,
-//         gender,
-//       },
-//       { new: true, runValidators: true },
-//     ).select("-password -otp -otpExpires -_id"); // <--- Hiding the _id here
-
-//     if (!updatedUser) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User record not found.",
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Profile updated successfully!",
-//       data: updatedUser, // User gets data back without the _id
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// };
-// edit profile
 const customerUpdate = async (req, res) => {
   const { userName, email, gender } = req.body;
 
   try {
-    // DEBUG: Check if req.user exists and has an _id
-    console.log("DEBUG: User from middleware:", req.user);
-
-    if (!req.user || !req.user._id) {
-      console.error("❌ CRITICAL: req.user or req.user._id is undefined!");
-      return res.status(401).json({
-        success: false,
-        message: "Authentication failed: User ID missing.",
-      });
-    }
-
     const userId = req.user._id;
 
-    // Perform the update
+    // 2. Perform the update
     const updatedUser = await Customer.findByIdAndUpdate(
       userId,
-      { userName, email, gender },
+      {
+        userName,
+        email,
+        gender,
+      },
       { new: true, runValidators: true },
-    ).select("-password -otp -otpExpires -_id");
+    ).select("-password -otp -otpExpires -_id"); // <--- Hiding the _id here
 
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: "User record not found in database.",
+        message: "User record not found.",
       });
     }
 
     res.status(200).json({
       success: true,
       message: "Profile updated successfully!",
-      data: updatedUser,
+      data: updatedUser, // User gets data back without the _id
     });
   } catch (error) {
-    // LOG THE FULL ERROR TO TERMINAL
-    console.error("❌ UPDATE ERROR:", error);
-
-    // Handle Duplicate Email Error (MongoDB Error Code 11000)
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "This email is already registered to another account.",
-      });
-    }
-
-    // Handle Validation Errors (e.g., gender not in enum)
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: error.message, // This will now tell you the EXACT reason in the browser
+      message: error.message,
     });
   }
 };
