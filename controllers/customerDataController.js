@@ -180,9 +180,10 @@ const logout = async (req, res) => {
     // We "clear" the cookie by setting its expiration to the past (Date.now(0))
     res.cookie("_v_bid", "", {
       httpOnly: true,
-      expires: new Date(0), // Sets expiration to 1970, effectively deleting it
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      expires: new Date(0),
+      secure: true,
+      sameSite: "None",
+      path: "/",
     });
 
     res.status(200).json({
@@ -197,10 +198,12 @@ const logout = async (req, res) => {
 //get profile data
 const getProfile = async (req, res) => {
   try {
-    // req.user was populated by the 'protect' middleware above
+    const userObj = req.user.toObject();
+    delete userObj._id;
+
     res.status(200).json({
       success: true,
-      data: req.user,
+      data: userObj,
     });
   } catch (error) {
     res.status(500).json({
@@ -335,7 +338,108 @@ const resetPassword = async (req, res) => {
 };
 
 const customerList = () => {};
-const customerUpdate = () => {};
+
+//edit profile
+// const customerUpdate = async (req, res) => {
+//   const { userName, email, gender } = req.body;
+
+//   try {
+//     const userId = req.user._id;
+
+//     // 2. Perform the update
+//     const updatedUser = await Customer.findByIdAndUpdate(
+//       userId,
+//       {
+//         userName,
+//         email,
+//         gender,
+//       },
+//       { new: true, runValidators: true },
+//     ).select("-password -otp -otpExpires -_id"); // <--- Hiding the _id here
+
+//     if (!updatedUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User record not found.",
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Profile updated successfully!",
+//       data: updatedUser, // User gets data back without the _id
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+// edit profile
+const customerUpdate = async (req, res) => {
+  const { userName, email, gender } = req.body;
+
+  try {
+    // DEBUG: Check if req.user exists and has an _id
+    console.log("DEBUG: User from middleware:", req.user);
+
+    if (!req.user || !req.user._id) {
+      console.error("❌ CRITICAL: req.user or req.user._id is undefined!");
+      return res.status(401).json({
+        success: false,
+        message: "Authentication failed: User ID missing.",
+      });
+    }
+
+    const userId = req.user._id;
+
+    // Perform the update
+    const updatedUser = await Customer.findByIdAndUpdate(
+      userId,
+      { userName, email, gender },
+      { new: true, runValidators: true },
+    ).select("-password -otp -otpExpires -_id");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User record not found in database.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully!",
+      data: updatedUser,
+    });
+  } catch (error) {
+    // LOG THE FULL ERROR TO TERMINAL
+    console.error("❌ UPDATE ERROR:", error);
+
+    // Handle Duplicate Email Error (MongoDB Error Code 11000)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered to another account.",
+      });
+    }
+
+    // Handle Validation Errors (e.g., gender not in enum)
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message, // This will now tell you the EXACT reason in the browser
+    });
+  }
+};
+
 module.exports = {
   customerSignUp,
   customerSignIn,

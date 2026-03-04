@@ -26,6 +26,12 @@ const customerDataSchema = new mongoose.Schema(
       enum: ["Male", "Female", "Other"],
       default: "Other",
     },
+
+    loyaltyPoints: {
+      type: Number,
+      default: 0,
+      min: 0, // Prevents points from ever going negative
+    },
   },
   { timestamps: true },
 );
