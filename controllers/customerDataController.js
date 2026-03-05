@@ -1,5 +1,6 @@
 require("dotenv").config();
 const Customer = require("../models/customerDataModel");
+const Order = require("../models/orderModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
@@ -11,10 +12,8 @@ const sendOrderSms = async (customerPhone, otp) => {
     let cleanNumber = customerPhone.replace(/\D/g, "");
     if (cleanNumber.startsWith("88")) cleanNumber = cleanNumber.substring(2);
 
-    const message = `Victus Byte: Your OTP is ${otp}.
-     Valid for 5 minutes. Do not share this code with anyone.`;
+    const message = `Victus Byte: Your OTP is ${otp}. Please do not share this code.`;
 
-    // Capture the response in a variable
     const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
       params: {
         api_key: process.env.BULKSMS_API_KEY,
@@ -24,8 +23,12 @@ const sendOrderSms = async (customerPhone, otp) => {
         message: message,
       },
     });
+
+    // Return the response data so the controller can see it
+    return response.data;
   } catch (error) {
-    console.error("❌ Network/Axios Error:", error.message);
+    console.error("❌ SMS Gateway Error:", error.message);
+    return { success: false, error: error.message };
   }
 };
 
@@ -79,10 +82,10 @@ const customerSignUp = async (req, res) => {
     }
 
     // 2. Prepare Auth Data
-    // const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
     const hashedPassword = await bcrypt.hash(password, saltRounds);
-    const generatedOtp = 454545;
+    //const generatedOtp = 454545;
 
     if (user && !user.isVerified) {
       // SCENARIO: Update unverified user (Forgot pass or retry)
@@ -94,8 +97,8 @@ const customerSignUp = async (req, res) => {
       await user.save();
     } else {
       // SCENARIO: Brand New User
-      const phoneSuffix = phone.slice(-3);
-      const timeSuffix = Date.now().toString().slice(-3);
+      const phoneSuffix = phone.slice(-2);
+      const timeSuffix = Date.now().toString().slice(-4);
       const newCID = `VB${phoneSuffix}-${timeSuffix}`;
 
       user = new Customer({
@@ -114,11 +117,13 @@ const customerSignUp = async (req, res) => {
     }
 
     // 3. SMS Integration (Placeholder)
-    // sendOrderSms(phone, generatedOtp);
+    const smsResponse = await sendOrderSms(phone, generatedOtp);
 
+    // 4. Return everything to the frontend
     res.status(200).json({
       success: true,
-      message: "Sign Up Successfull.",
+      message: "Sign Up Processed.",
+      smsDebug: smsResponse, // This will show the BulkSMSBD response on the client side
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -275,8 +280,8 @@ const forgotPasswordSearch = async (req, res) => {
     }
 
     // 2. Generate OTP (6 digits)
-    //const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otp = 454545;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // const otp = 454545;
 
     // 3. Save OTP to user record (with expiry)
     user.otp = otp;
@@ -284,11 +289,12 @@ const forgotPasswordSearch = async (req, res) => {
     await user.save();
 
     // 4. Send SMS (Integrate your ForBulkSMS or other gateway here)
-    // sendOrderSms(phone,otp);
+    const smsResponse = await sendOrderSms(phone, otp);
 
     res.status(200).json({
       success: true,
       message: "OTP sent to your phone",
+      smsDebug: smsResponse,
       user: {
         userName: user.userName,
         images: user.images || null, // For the "Welcome Mostakin" part
@@ -336,7 +342,26 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const customerList = () => {};
+const customerList = async (req, res) => {
+  try {
+    const customers = await Customer.find({})
+      .select("-password -otp -otpExpires -_id")
+      .sort({ createdAt: -1 });
+
+    // 2. Return the list
+    res.status(200).json({
+      success: true,
+      count: customers.length,
+      data: customers,
+    });
+  } catch (error) {
+    console.error("Fetch Error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
 
 //edit profile
 const customerUpdate = async (req, res) => {
@@ -376,6 +401,107 @@ const customerUpdate = async (req, res) => {
   }
 };
 
+//chnage password
+const customerPassowrdChanged = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user._id; // Provided by 'protect' middleware
+
+    // 1. Find user (Must include password for comparison)
+    const user = await Customer.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // 2. VERIFY OLD PASSWORD
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password does not match our records.",
+      });
+    }
+
+    // 3. Hash the NEW password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update password
+    user.password = hashedPassword;
+
+    // Ensure OTP fields are cleared if they exist
+    user.otp = undefined;
+    user.otpExpires = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully!",
+    });
+  } catch (error) {
+    console.error("Password Change Error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update password. Please try again.",
+    });
+  }
+};
+
+//my order
+const myOrder = async (req, res) => {
+  try {
+    const { oid, isStatus } = req.query;
+
+    // --- TASK 1: PUBLIC TRACKING (No Login Required) ---
+    if (isStatus === "true" && oid) {
+      const order = await Order.findOne({ order_id: oid });
+
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found" });
+      }
+
+      // --- Task: Order Found ---
+      const statusMap = ["Pending", "Confirmed", "Shipped", "Completed"];
+      const statusIndex = statusMap.indexOf(order.status);
+
+      return res.status(200).json({
+        success: true,
+        found: true,
+        statusIndex: statusIndex !== -1 ? statusIndex : 0, // Fallback to Pending
+      });
+    }
+
+    // --- TASK 2: PRIVATE ORDER LIST (Login Required) ---
+    // Check if user exists (attached by protect middleware)
+    if (!req.user || !req.user.cID) {
+      return res.status(401).json({
+        success: false,
+        message: "Please login to view your order history.",
+      });
+    }
+
+    const customerCustomID = req.user.cID;
+    const orders = await Order.find({ customer_id: customerCustomID }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      isTracking: false,
+      count: orders.length,
+      orders: orders || [],
+    });
+  } catch (error) {
+    console.error("Order Fetch Error:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
 module.exports = {
   customerSignUp,
   customerSignIn,
@@ -386,4 +512,6 @@ module.exports = {
   getProfile,
   resetPassword,
   forgotPasswordSearch,
+  customerPassowrdChanged,
+  myOrder,
 };

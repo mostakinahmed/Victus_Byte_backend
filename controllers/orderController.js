@@ -27,15 +27,21 @@ const getSmsBalance = async (req, res) => {
 //sms
 const sendOrderSms = async (customerPhone, orderId) => {
   try {
+    // 1. Clean and normalize number to 01XXXXXXXXX
     let cleanNumber = customerPhone.replace(/\D/g, "");
-    if (cleanNumber.startsWith("88")) cleanNumber = cleanNumber.substring(2);
+    if (cleanNumber.startsWith("880")) {
+      cleanNumber = cleanNumber.substring(2);
+    } else if (cleanNumber.startsWith("88")) {
+      cleanNumber = cleanNumber.substring(2);
+    }
 
-    const message = `Victus Byte: Order #${orderId} is received!
-Track: victusbyte.com/track-order
-Hotline: 09611-342936
-Stay with us, Thank you.`;
+    if (!cleanNumber.startsWith("0")) {
+      cleanNumber = "0" + cleanNumber;
+    }
 
-    // Capture the response in a variable
+    const message = `Victus Byte: Order #${orderId} is received!\nTrack: victusbyte.com/track-order\nHotline: 09611-342936\nStay with us, Thank you.`;
+
+    // 2. API Call
     const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
       params: {
         api_key: process.env.BULKSMS_API_KEY,
@@ -45,25 +51,30 @@ Stay with us, Thank you.`;
         message: message,
       },
     });
-    // ADD THIS LINE TO SEE THE REAL DATA IN TERMINAL
-    console.log("RAW GATEWAY DATA:", response.data);
+
+    // 3. Terminal Debugging
+    console.log("RAW GATEWAY DATA (Order):", response.data);
     const statusCode = response.data.status_code;
 
     if (statusCode === 202) {
-      console.log("✅ SMS Sent Successfully to:", formattedPhone);
+      console.log("✅ Order SMS Sent Successfully to:", cleanNumber);
     } else {
       console.error(
-        `❌ SMS Failed. Error Code ${statusCode}: ${response.data.message}`,
+        `❌ Order SMS Failed. Code ${statusCode}: ${response.data.message || response.data.error_message}`,
       );
 
       if (statusCode === 1032) {
         console.log(
-          "👉 ACTION REQUIRED: Whitelist your HostSeba IP in ForBulkSMS panel.",
+          "👉 ACTION REQUIRED: Whitelist your Server IP in BulkSMSBD panel.",
         );
       }
     }
+
+    // 4. Return data to the controller for frontend debugging
+    return response.data;
   } catch (error) {
-    console.error("❌ Network/Axios Error:", error.message);
+    console.error("❌ Order SMS Function Error:", error.message);
+    return { success: false, error: error.message };
   }
 };
 
@@ -85,18 +96,34 @@ const getAllOrder = async (req, res) => {
 };
 
 // Insert into MongoDB
-67; // CREATE new Order
+// CREATE new Order
 const createOrder = async (req, res) => {
   try {
-    const newOrder = new order(req.body); // Data from request
-    const savedProduct = await newOrder.save();
+    // 1. Create and Save the Order to MongoDB
+    const newOrder = new Order(req.body);
+    const savedOrder = await newOrder.save();
 
-    //sms funciton
-    sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
+    // 2. Trigger SMS Service and capture response
+    // We use await here if you want to see the SMS status in the API response
+    const smsStatus = await sendOrderSms(
+      savedOrder.shipping_address.phone,
+      savedOrder.order_id,
+    );
 
-    res.status(201).json(savedProduct);
+    // 3. Return Saved Order + SMS Debug Info
+    res.status(201).json({
+      success: true,
+      message: "Order placed successfully!",
+      order: savedOrder,
+      smsDebug: smsStatus, // This helps you see why SMS might fail in production
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Order Creation Error:", error.message);
+    res.status(400).json({
+      success: false,
+      message: "Failed to place order",
+      error: error.message,
+    });
   }
 };
 
@@ -169,9 +196,14 @@ const createOrderClient = async (req, res) => {
       const savedProduct = await newOrder.save();
 
       // Send SMS
-      sendOrderSms(savedProduct.shipping_address.phone, savedProduct.order_id);
+      const smsStatus = await sendOrderSms(
+        savedProduct.shipping_address.phone,
+        savedProduct.order_id,
+      );
 
-      res.status(201).json({ success: true, data: savedProduct });
+      res
+        .status(201)
+        .json({ success: true, data: savedProduct, smsDebug: smsStatus });
     } else {
       res.status(400).json({
         success: false,

@@ -1,0 +1,54 @@
+const sendOrderSms = async (customerPhone, otp) => {
+  try {
+    // 1. Formatting the number (Ensure 11 digits starting with 01)
+    let cleanNumber = customerPhone.replace(/\D/g, "");
+    if (cleanNumber.startsWith("880")) {
+      cleanNumber = cleanNumber.substring(2);
+    } else if (!cleanNumber.startsWith("0") && cleanNumber.length === 10) {
+      cleanNumber = "0" + cleanNumber;
+    }
+
+    console.log(`\n--- 🚀 SMS DEBUG START ---`);
+    console.log(`📱 Target Number: ${cleanNumber}`);
+    console.log(
+      `🔑 Using API Key: ${process.env.BULKSMS_API_KEY ? "EXISTS" : "MISSING"}`,
+    );
+    console.log(`🆔 Sender ID: ${process.env.BULKSMS_SENDER_ID}`);
+
+    const message = `Victus Byte: Your OTP is ${otp}. Please do not share this code.`;
+
+    // 2. Capture the response
+    const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
+      params: {
+        api_key: process.env.BULKSMS_API_KEY,
+        type: "text",
+        number: cleanNumber,
+        senderid: process.env.BULKSMS_SENDER_ID,
+        message: message,
+      },
+    });
+
+    // 3. Log the ACTUAL response from BulkSMSBD
+    console.log("📩 GATEWAY RESPONSE DATA:", response.data);
+
+    if (
+      response.data.success === "success" ||
+      response.data.status_code === 202
+    ) {
+      console.log("✅ SMS Sent Successfully!");
+    } else {
+      console.log("❌ SMS Gateway rejected the request.");
+      // BulkSMSBD error codes: 1032 (IP not whitelisted), 1025 (Low Balance)
+    }
+    console.log(`--- 🏁 SMS DEBUG END ---\n`);
+  } catch (error) {
+    console.error("❌ Network/Axios Error:");
+    if (error.response) {
+      // The server responded with a status code outside of 2xx
+      console.error("Data:", error.response.data);
+      console.error("Status:", error.status);
+    } else {
+      console.error("Message:", error.message);
+    }
+  }
+};
