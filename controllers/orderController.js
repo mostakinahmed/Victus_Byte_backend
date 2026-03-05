@@ -2,6 +2,7 @@ const order = require("../models/orderModel");
 const products = require("../models/productModel");
 const coupons = require("../models/couponModel");
 const axios = require("axios");
+const SmsLog = require("../models/smsModel");
 
 //------balance check api
 // Function to check BulkSmsBD balance
@@ -25,12 +26,65 @@ const getSmsBalance = async (req, res) => {
 };
 
 //sms
+// const sendOrderSms = async (customerPhone, orderId) => {
+//   try {
+//     // 1. Clean and normalize number to 01XXXXXXXXX
+//     let cleanNumber = customerPhone.replace(/\D/g, "");
+//     if (cleanNumber.startsWith("880")) {
+//       cleanNumber = cleanNumber.substring(2);
+//     } else if (cleanNumber.startsWith("88")) {
+//       cleanNumber = cleanNumber.substring(2);
+//     }
+
+//     if (!cleanNumber.startsWith("0")) {
+//       cleanNumber = "0" + cleanNumber;
+//     }
+
+//     const message = `Victus Byte: Order #${orderId} is received!\nTrack: victusbyte.com/track-order\nHotline: 09611-342936\nStay with us, Thank you.`;
+
+//     // 2. API Call
+//     const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
+//       params: {
+//         api_key: process.env.BULKSMS_API_KEY,
+//         type: "text",
+//         number: cleanNumber,
+//         senderid: process.env.BULKSMS_SENDER_ID,
+//         message: message,
+//       },
+//     });
+
+//     // 3. Terminal Debugging
+//     console.log("RAW GATEWAY DATA (Order):", response.data);
+//     const statusCode = response.data.status_code;
+
+//     if (statusCode === 202) {
+//       console.log("✅ Order SMS Sent Successfully to:", cleanNumber);
+//     } else {
+//       console.error(
+//         `❌ Order SMS Failed. Code ${statusCode}: ${response.data.message || response.data.error_message}`,
+//       );
+
+//       if (statusCode === 1032) {
+//         console.log(
+//           "👉 ACTION REQUIRED: Whitelist your Server IP in BulkSMSBD panel.",
+//         );
+//       }
+//     }
+
+//     // 4. Return data to the controller for frontend debugging
+//     return response.data;
+//   } catch (error) {
+//     console.error("❌ Order SMS Function Error:", error.message);
+//     return { success: false, error: error.message };
+//   }
+// };
+
 const sendOrderSms = async (customerPhone, orderId) => {
   try {
-    // 1. Clean and normalize number to 01XXXXXXXXX
+    // 1. Clean and normalize number
     let cleanNumber = customerPhone.replace(/\D/g, "");
     if (cleanNumber.startsWith("880")) {
-      cleanNumber = cleanNumber.substring(2);
+      cleanNumber = cleanNumber.substring(3); // Fix: 880 is 3 digits
     } else if (cleanNumber.startsWith("88")) {
       cleanNumber = cleanNumber.substring(2);
     }
@@ -52,27 +106,40 @@ const sendOrderSms = async (customerPhone, orderId) => {
       },
     });
 
-    // 3. Terminal Debugging
+    // 3. --- SAVE TO DATABASE (Monitoring Logic) ---
+    // Mapping your schema to BulkSMSBD's response keys
+    await SmsLog.create({
+      phoneNumber: cleanNumber,
+      message: message,
+      type: "ORDER",
+      message_id: response.data.message_id, // From BulkSMSBD
+      response_code: response.data.response_code, // From BulkSMSBD (e.g., 202)
+      success_message: response.data.success_message,
+      error_message: response.data.error_message || "",
+    });
+
+    // 4. Terminal Debugging
     console.log("RAW GATEWAY DATA (Order):", response.data);
-    const statusCode = response.data.status_code;
+    const statusCode = response.data.response_code; // Usually response_code in BulkSMSBD
 
     if (statusCode === 202) {
       console.log("✅ Order SMS Sent Successfully to:", cleanNumber);
     } else {
       console.error(
-        `❌ Order SMS Failed. Code ${statusCode}: ${response.data.message || response.data.error_message}`,
+        `❌ Order SMS Failed. Code ${statusCode}: ${response.data.error_message}`,
       );
-
-      if (statusCode === 1032) {
-        console.log(
-          "👉 ACTION REQUIRED: Whitelist your Server IP in BulkSMSBD panel.",
-        );
-      }
     }
 
-    // 4. Return data to the controller for frontend debugging
     return response.data;
   } catch (error) {
+    // Log System/Network Errors to DB too
+    await SmsLog.create({
+      phoneNumber: customerPhone,
+      message: "Order SMS Attempt",
+      error_message: error.message,
+      response_code: 500,
+    });
+
     console.error("❌ Order SMS Function Error:", error.message);
     return { success: false, error: error.message };
   }

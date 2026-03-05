@@ -32,7 +32,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // --- 4. ROUTES ---
-
 app.use("/api/product", require("./routes/productRoutes"));
 app.use("/api/category", require("./routes/categoryRoutes"));
 app.use("/api/order", require("./routes/orderRoutes"));
@@ -40,6 +39,7 @@ app.use("/api/user", require("./routes/userDataRoutes"));
 app.use("/api/stock", require("./routes/stockRoutes"));
 app.use("/api/coupon", require("./routes/couponRoutes"));
 app.use("/api/customer", require("./routes/customerDataRoutes"));
+app.use("/api/sms-log", require("./routes/smsLogRoute"));
 
 // --- 5. HOME ROUTE ---
 app.get("/", (req, res) => {
