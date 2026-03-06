@@ -1,13 +1,14 @@
 require("dotenv").config();
 const Customer = require("../models/customerDataModel");
 const Order = require("../models/orderModel");
+const SmsLog = require("../models/smsModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const axios = require("axios");
 
 //sms part
-const sendOrderSms = async (customerPhone, otp) => {
+const sendOrderSm = async (customerPhone, otp) => {
   try {
     let cleanNumber = customerPhone.replace(/\D/g, "");
     if (cleanNumber.startsWith("88")) cleanNumber = cleanNumber.substring(2);
@@ -28,6 +29,72 @@ const sendOrderSms = async (customerPhone, otp) => {
     return response.data;
   } catch (error) {
     console.error("❌ SMS Gateway Error:", error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+const sendOrderSms = async (customerPhone, otp) => {
+  try {
+    // 1. Clean and normalize number
+    let cleanNumber = customerPhone.replace(/\D/g, "");
+    if (cleanNumber.startsWith("880")) {
+      cleanNumber = cleanNumber.substring(3); // Fix: 880 is 3 digits
+    } else if (cleanNumber.startsWith("88")) {
+      cleanNumber = cleanNumber.substring(2);
+    }
+
+    if (!cleanNumber.startsWith("0")) {
+      cleanNumber = "0" + cleanNumber;
+    }
+
+    const message = `Victus Byte: Your OTP is ${otp}. Please do not share this code.`;
+
+    // 2. API Call
+    const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
+      params: {
+        api_key: process.env.BULKSMS_API_KEY,
+        type: "text",
+        number: cleanNumber,
+        senderid: process.env.BULKSMS_SENDER_ID,
+        message: message,
+      },
+    });
+
+    // 3. --- SAVE TO DATABASE (Monitoring Logic) ---
+    // Mapping your schema to BulkSMSBD's response keys
+    await SmsLog.create({
+      phoneNumber: cleanNumber,
+      message: message,
+      type: "OTP",
+      message_id: response.data.message_id, // From BulkSMSBD
+      response_code: response.data.response_code, // From BulkSMSBD (e.g., 202)
+      success_message: response.data.success_message,
+      error_message: response.data.error_message || "",
+    });
+
+    // 4. Terminal Debugging
+    console.log("RAW GATEWAY DATA (OTP):", response.data);
+    const statusCode = response.data.response_code; // Usually response_code in BulkSMSBD
+
+    if (statusCode === 202) {
+      console.log("✅ Order SMS Sent Successfully to:", cleanNumber);
+    } else {
+      console.error(
+        `❌ Order SMS Failed. Code ${statusCode}: ${response.data.error_message}`,
+      );
+    }
+
+    return response.data;
+  } catch (error) {
+    // Log System/Network Errors to DB too
+    await SmsLog.create({
+      phoneNumber: customerPhone,
+      message: "OTP SMS Attempt",
+      error_message: error.message,
+      response_code: 500,
+    });
+
+    console.error("❌ OTP SMS Function Error:", error.message);
     return { success: false, error: error.message };
   }
 };
