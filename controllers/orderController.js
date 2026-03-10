@@ -3,8 +3,49 @@ const products = require("../models/productModel");
 const coupons = require("../models/couponModel");
 const axios = require("axios");
 const SmsLog = require("../models/smsModel");
+const TrackLink = require("../models/urlShortModel");
 
-//------balance check api
+//url create
+const generateTrackingLink = async (order_id) => {
+  try {
+    // 1. Dynamic Import for nanoid
+    const { customAlphabet } = await import("nanoid");
+    const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+    const generateShortId = customAlphabet(alphabet, 6);
+
+    const originalUrl = `https://victusbyte.com/track-order/${order_id}`;
+
+    let link;
+    let isSaved = false;
+    let attempts = 0;
+
+    // 2. Collision Handling Loop
+    while (!isSaved && attempts < 5) {
+      attempts++;
+      const shortId = generateShortId();
+
+      try {
+        link = await TrackLink.create({
+          shortId,
+          originalUrl,
+        });
+        isSaved = true;
+      } catch (dbError) {
+        if (dbError.code === 11000 && attempts < 5) {
+          console.warn(`Collision on attempt ${attempts}. Retrying...`);
+          continue;
+        }
+        throw dbError; // Rethrow if it's not a collision or too many attempts
+      }
+    }
+
+    return `https://victusbyte.com/order/${link.shortId}`;
+  } catch (error) {
+    console.error("Helper Function Error:", error.message);
+    throw new Error("Failed to generate tracking link: " + error.message);
+  }
+};
+
 // Function to check BulkSmsBD balance
 const getSmsBalance = async (req, res) => {
   try {
@@ -79,7 +120,7 @@ const getSmsBalance = async (req, res) => {
 //   }
 // };
 
-const sendOrderSms = async (customerPhone, orderId) => {
+const sendOrderSms = async (customerPhone, orderId, shortUrl) => {
   try {
     // 1. Clean and normalize number
     let cleanNumber = customerPhone.replace(/\D/g, "");
@@ -93,7 +134,7 @@ const sendOrderSms = async (customerPhone, orderId) => {
       cleanNumber = "0" + cleanNumber;
     }
 
-    const message = `Victus Byte: Order #${orderId} is received!\nTrack: victusbyte.com/track-order\nHotline: 09611-342936\nStay with us, Thank you.`;
+    const message = `Victus Byte: Order #${orderId} is received!\nTrack: ${shortUrl}\nHotline: 09611-342936\nStay with us, Thank you.`;
 
     // 2. API Call
     const response = await axios.get("https://bulksmsbd.net/api/smsapi", {
@@ -162,27 +203,89 @@ const getAllOrder = async (req, res) => {
   }
 };
 
-// Insert into MongoDB
 // CREATE new Order
-const createOrder = async (req, res) => {
-  try {
-    // 1. Create and Save the Order to MongoDB
-    const newOrder = new Order(req.body);
-    const savedOrder = await newOrder.save();
+// const createOrder = async (req, res) => {
+//   try {
+//     // 1. Create and Save the Order to MongoDB
+//     const newOrder = new Order(req.body);
+//     const savedOrder = await newOrder.save();
 
-    // 2. Trigger SMS Service and capture response
-    // We use await here if you want to see the SMS status in the API response
+//     //link create
+//     const shortUrl = await generateTrackingLink(newOrder.order_id);
+
+//     const smsStatus = await sendOrderSms(
+//       savedOrder.shipping_address.phone,
+//       savedOrder.order_id,
+//       shortUrl,
+//     );
+
+//     // 3. Return Saved Order + SMS Debug Info
+//     res.status(201).json({
+//       success: true,
+//       message: "Order placed successfully!",
+//       order: savedOrder,
+//       smsDebug: smsStatus, // This helps you see why SMS might fail in production
+//     });
+//   } catch (error) {
+//     console.error("Order Creation Error:", error.message);
+//     res.status(400).json({
+//       success: false,
+//       message: "Failed to place order",
+//       error: error.message,
+//     });
+//   }
+// };
+
+const createOrder = async (req, res) => {
+  // --- Helper Function for Fallback ID ---
+  const generateFallbackId = () => {
+    const timePart = Date.now().toString().slice(-4); // 4 digits of time
+    const randomPart = Math.floor(10 + Math.random() * 90).toString(); // 2 digits
+    return timePart + randomPart;
+  };
+
+  const saveWithRetry = async (orderData) => {
+    try {
+      const newOrder = new Order(orderData);
+      return await newOrder.save();
+    } catch (error) {
+      // Check for MongoDB Duplicate Key Error (Code 11000)
+      if (
+        error.code === 11000 &&
+        error.keyPattern &&
+        error.keyPattern.order_id
+      ) {
+        console.log("Collision detected! Generating fallback ID...");
+
+        // Update the order_id with fallback logic
+        orderData.order_id = generateFallbackId();
+
+        // Recursive call: Try saving again with the new ID
+        return await saveWithRetry(orderData);
+      }
+      throw error; // Rethrow if it's a different error (validation, etc.)
+    }
+  };
+
+  try {
+    // 1. Attempt to save (Starts with ID from req.body)
+    const savedOrder = await saveWithRetry(req.body);
+
+    // 2. Link creation using the FINAL saved ID
+    const shortUrl = await generateTrackingLink(savedOrder.order_id);
+
+    // 3. Send SMS
     const smsStatus = await sendOrderSms(
       savedOrder.shipping_address.phone,
       savedOrder.order_id,
+      shortUrl,
     );
 
-    // 3. Return Saved Order + SMS Debug Info
     res.status(201).json({
       success: true,
       message: "Order placed successfully!",
       order: savedOrder,
-      smsDebug: smsStatus, // This helps you see why SMS might fail in production
+      smsDebug: smsStatus,
     });
   } catch (error) {
     console.error("Order Creation Error:", error.message);
@@ -195,90 +298,195 @@ const createOrder = async (req, res) => {
 };
 
 // CREATE new Order for client
+// const createOrderClient = async (req, res) => {
+//   try {
+//     // 1. Get client data (In production, replace dummyOrderPayload with req.body)
+//     const clientOrder = req.body;
+
+//     // 2. Extract IDs and quantities for DB verification
+//     const pid = clientOrder.items.map((item) => ({
+//       id: item.product_id,
+//       qty: item.quantity,
+//     }));
+
+//     // 3. IMPORTANT: Wait for the DB to calculate the real values
+//     const dbData = await varifyOrder(pid);
+
+//     //coupon check
+//     // 1. Check if a coupon object exists in the request
+//     let verifiedCouponValue = 0;
+//     if (clientOrder.coupon && clientOrder.coupon.couponID) {
+//       // 2. Find the coupon in your database to verify it's real and active
+//       const dbCoupon = await coupons.findOne({
+//         couponID: clientOrder.coupon.couponID.toUpperCase(),
+//         status: true,
+//       });
+
+//       if (!dbCoupon) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: "Invalid or expired coupon code." });
+//       }
+
+//       // 3. Triple Check: Verify the subtotal meets the minTK requirement on the SERVER side
+//       if (clientOrder.subtotal < dbCoupon.minTK) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Minimum purchase of ৳${dbCoupon.minTK} required for this coupon.`,
+//         });
+//       }
+
+//       // 4. Verification: Ensure the discount value sent by client matches the DB value
+//       if (clientOrder.coupon.value !== dbCoupon.value) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: "Coupon value mismatch detected." });
+//       }
+
+//       verifiedCouponValue = dbCoupon.value;
+//     }
+//     // 4. THE TRIPLE CHECK (The Final Lock)
+//     const isSubtotalMatch =
+//       Math.round(clientOrder.subtotal) === Math.round(dbData.subtotal);
+//     const isDiscountMatch =
+//       Math.round(clientOrder.discount) === Math.round(dbData.totalDiscount);
+
+//     const expectedTotal =
+//       dbData.subtotal -
+//       dbData.totalDiscount +
+//       clientOrder.shipping_cost -
+//       verifiedCouponValue;
+
+//     const isTotalAmountMatch =
+//       Math.round(clientOrder.total_amount) === Math.round(expectedTotal);
+
+//     if (isSubtotalMatch && isDiscountMatch && isTotalAmountMatch) {
+//       // 5. Success! Now we save to MongoDB
+//       const newOrder = new order(clientOrder);
+//       const savedProduct = await newOrder.save();
+
+//       //create short link and save it db
+//       const shortUrl = await generateTrackingLink(newOrder.order_id);
+
+//       // Send SMS
+//       const smsStatus = await sendOrderSms(
+//         savedProduct.shipping_address.phone,
+//         savedProduct.order_id,
+//         shortUrl,
+//       );
+
+//       res
+//         .status(201)
+//         .json({ success: true, data: savedProduct, smsDebug: smsStatus });
+//     } else {
+//       res.status(400).json({
+//         success: false,
+//         message:
+//           "Security Alert: Order verification failed. Price or Discount mismatch!",
+//       });
+//     }
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 const createOrderClient = async (req, res) => {
+  // --- Helper: Generate Fallback 6-digit ID (4 Time + 2 Random) ---
+  const generateFallbackId = () => {
+    const timePart = Date.now().toString().slice(-4);
+    const randomPart = Math.floor(10 + Math.random() * 90).toString();
+    return timePart + randomPart;
+  };
+
+  // --- Helper: Recursive Save Function ---
+  const saveWithRetry = async (orderData) => {
+    try {
+      const newOrder = new order(orderData);
+      return await newOrder.save();
+    } catch (error) {
+      // Catch MongoDB Duplicate Key Error for order_id
+      if (error.code === 11000 && error.keyPattern?.order_id) {
+        console.warn(`Collision! Retrying with new ID...`);
+        orderData.order_id = generateFallbackId();
+        return await saveWithRetry(orderData);
+      }
+      throw error;
+    }
+  };
+
   try {
-    // 1. Get client data (In production, replace dummyOrderPayload with req.body)
     const clientOrder = req.body;
 
-    // 2. Extract IDs and quantities for DB verification
+    // 1. Verification Logic (Subtotal, Discount, etc.)
     const pid = clientOrder.items.map((item) => ({
       id: item.product_id,
       qty: item.quantity,
     }));
 
-    // 3. IMPORTANT: Wait for the DB to calculate the real values
     const dbData = await varifyOrder(pid);
 
-    //coupon check
-    // 1. Check if a coupon object exists in the request
     let verifiedCouponValue = 0;
     if (clientOrder.coupon && clientOrder.coupon.couponID) {
-      // 2. Find the coupon in your database to verify it's real and active
       const dbCoupon = await coupons.findOne({
         couponID: clientOrder.coupon.couponID.toUpperCase(),
         status: true,
       });
 
-      if (!dbCoupon) {
+      if (!dbCoupon)
         return res
           .status(400)
-          .json({ success: false, message: "Invalid or expired coupon code." });
-      }
-
-      // 3. Triple Check: Verify the subtotal meets the minTK requirement on the SERVER side
-      if (clientOrder.subtotal < dbCoupon.minTK) {
-        return res.status(400).json({
-          success: false,
-          message: `Minimum purchase of ৳${dbCoupon.minTK} required for this coupon.`,
-        });
-      }
-
-      // 4. Verification: Ensure the discount value sent by client matches the DB value
-      if (clientOrder.coupon.value !== dbCoupon.value) {
+          .json({ success: false, message: "Invalid coupon." });
+      if (clientOrder.subtotal < dbCoupon.minTK)
         return res
           .status(400)
-          .json({ success: false, message: "Coupon value mismatch detected." });
-      }
+          .json({ success: false, message: "Min purchase not met." });
+      if (clientOrder.coupon.value !== dbCoupon.value)
+        return res
+          .status(400)
+          .json({ success: false, message: "Coupon mismatch." });
 
       verifiedCouponValue = dbCoupon.value;
     }
-    // 4. THE TRIPLE CHECK (The Final Lock)
+
+    // 2. Triple Check Calculations
     const isSubtotalMatch =
       Math.round(clientOrder.subtotal) === Math.round(dbData.subtotal);
     const isDiscountMatch =
       Math.round(clientOrder.discount) === Math.round(dbData.totalDiscount);
-
     const expectedTotal =
       dbData.subtotal -
       dbData.totalDiscount +
       clientOrder.shipping_cost -
       verifiedCouponValue;
-
     const isTotalAmountMatch =
       Math.round(clientOrder.total_amount) === Math.round(expectedTotal);
 
     if (isSubtotalMatch && isDiscountMatch && isTotalAmountMatch) {
-      // 5. Success! Now we save to MongoDB
-      const newOrder = new order(clientOrder);
-      const savedProduct = await newOrder.save();
+      // 3. SECURE SAVE WITH RETRY (Handles collisions automatically)
+      const savedProduct = await saveWithRetry(clientOrder);
 
-      // Send SMS
+      // 4. Post-Save Operations (Use savedProduct.order_id in case it changed!)
+      const shortUrl = await generateTrackingLink(savedProduct.order_id);
+
       const smsStatus = await sendOrderSms(
         savedProduct.shipping_address.phone,
         savedProduct.order_id,
+        shortUrl,
       );
 
-      res
-        .status(201)
-        .json({ success: true, data: savedProduct, smsDebug: smsStatus });
+      res.status(201).json({
+        success: true,
+        data: savedProduct,
+        smsDebug: smsStatus,
+      });
     } else {
       res.status(400).json({
         success: false,
-        message:
-          "Security Alert: Order verification failed. Price or Discount mismatch!",
+        message: "Security Alert: Price or Discount mismatch!",
       });
     }
   } catch (error) {
+    console.error("Order Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

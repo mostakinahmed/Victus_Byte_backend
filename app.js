@@ -40,6 +40,7 @@ app.use("/api/stock", require("./routes/stockRoutes"));
 app.use("/api/coupon", require("./routes/couponRoutes"));
 app.use("/api/customer", require("./routes/customerDataRoutes"));
 app.use("/api/sms-log", require("./routes/smsLogRoute"));
+app.use("/", require("./routes/urlShortRoutes"));
 
 // --- 5. HOME ROUTE ---
 app.get("/", (req, res) => {
