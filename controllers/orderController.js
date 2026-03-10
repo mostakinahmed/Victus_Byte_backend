@@ -246,7 +246,7 @@ const createOrder = async (req, res) => {
 
   const saveWithRetry = async (orderData) => {
     try {
-      const newOrder = new Order(orderData);
+      const newOrder = new order(orderData);
       return await newOrder.save();
     } catch (error) {
       // Check for MongoDB Duplicate Key Error (Code 11000)
