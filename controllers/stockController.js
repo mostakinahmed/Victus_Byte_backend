@@ -47,7 +47,7 @@ const createStock = async (req, res) => {
 // Add New Stock in a existing product
 const addStock = async (req, res) => {
   try {
-    const { pID, skuID, OID, comment, status } = req.body;
+    const { pID, skuID, OID, cost, comment, status } = req.body;
 
     if (!pID || !skuID) {
       return res.status(400).json({ message: "pID and skuId are required" });
@@ -70,7 +70,7 @@ const addStock = async (req, res) => {
     }
 
     // Add new SKU to the array
-    currentStock.SKU.push({ skuID, OID, comment, status });
+    currentStock.SKU.push({ skuID, OID, comment, cost, status });
     await currentStock.save();
 
     res.status(200).json({
