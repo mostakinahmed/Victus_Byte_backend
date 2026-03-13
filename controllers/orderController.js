@@ -39,7 +39,7 @@ const generateTrackingLink = async (order_id) => {
       }
     }
 
-    return `https://victusbyte.com/order/${link.shortId}`;
+    return `https://victusbyte.com/${link.shortId}`;
   } catch (error) {
     console.error("Helper Function Error:", error.message);
     throw new Error("Failed to generate tracking link: " + error.message);
