@@ -4,9 +4,7 @@ const skuSchema = new mongoose.Schema(
   {
     skuID: { type: String, required: true },
     OID: { type: String, default: null },
-    selling_price: { type: Number, default: 0 },
     cost: { type: Number, default: 0 },
-    profit: { type: Number, default: 0 },
     comment: { type: String },
     status: { type: Boolean, default: true },
   },

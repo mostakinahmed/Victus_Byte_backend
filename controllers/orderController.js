@@ -1,4 +1,5 @@
 const order = require("../models/orderModel");
+const stock = require("../models/stockModel");
 const products = require("../models/productModel");
 const coupons = require("../models/couponModel");
 const axios = require("axios");
@@ -203,39 +204,6 @@ const getAllOrder = async (req, res) => {
   }
 };
 
-// CREATE new Order
-// const createOrder = async (req, res) => {
-//   try {
-//     // 1. Create and Save the Order to MongoDB
-//     const newOrder = new Order(req.body);
-//     const savedOrder = await newOrder.save();
-
-//     //link create
-//     const shortUrl = await generateTrackingLink(newOrder.order_id);
-
-//     const smsStatus = await sendOrderSms(
-//       savedOrder.shipping_address.phone,
-//       savedOrder.order_id,
-//       shortUrl,
-//     );
-
-//     // 3. Return Saved Order + SMS Debug Info
-//     res.status(201).json({
-//       success: true,
-//       message: "Order placed successfully!",
-//       order: savedOrder,
-//       smsDebug: smsStatus, // This helps you see why SMS might fail in production
-//     });
-//   } catch (error) {
-//     console.error("Order Creation Error:", error.message);
-//     res.status(400).json({
-//       success: false,
-//       message: "Failed to place order",
-//       error: error.message,
-//     });
-//   }
-// };
-
 const createOrder = async (req, res) => {
   // --- Helper Function for Fallback ID ---
   const generateFallbackId = () => {
@@ -247,6 +215,7 @@ const createOrder = async (req, res) => {
   const saveWithRetry = async (orderData) => {
     try {
       const newOrder = new order(orderData);
+
       return await newOrder.save();
     } catch (error) {
       // Check for MongoDB Duplicate Key Error (Code 11000)
@@ -517,61 +486,175 @@ const varifyOrder = async (pid) => {
 
   return orderSummary;
 };
+
 // PATCH /orders/:orderId
+// const orderUpdate = async (req, res) => {
+//   try {
+//     // Ensure route param matches
+//     const { orderId } = req.params;
+//     const updates = req.body;
+
+//     if (!orderId) {
+//       return res
+//         .status(400)
+//         .json({ message: "Order ID is required in params" });
+//     }
+
+//     // Find order by correct DB field (replace 'order_id' if your field is different)
+//     const orderData = await order.findOne({ order_id: orderId });
+//     if (!orderData) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     // Update payment status if provided
+//     if (updates.payment?.status) {
+//       orderData.payment.status = updates.payment.status;
+//     }
+
+//     // 4️⃣ Update order status if provided
+//     if (updates.status) {
+//       orderData.status = updates.status;
+//     }
+
+//     // Update items (SKU & IMEI)
+//     if (updates.items && Array.isArray(updates.items)) {
+//       updates.items.forEach((itemUpdate) => {
+//         const item = orderData.items.find(
+//           (i) => i.product_id === itemUpdate.product_id,
+//         );
+
+//         if (!item) return;
+
+//         // Update SKU
+//         if (itemUpdate.skuID !== undefined) item.skuID = itemUpdate.skuID;
+
+//         // Update IMEI (single string)
+//         if (itemUpdate.imei !== undefined) {
+//           item.imei = itemUpdate.imei; // just store the string directly
+//         }
+//       });
+//     }
+
+//     //update order selling price, sku status, OID
+//     if (orderData.status === "Confirmed") {
+//       try {
+//         // 2. Map through items to update the SKU Ledger
+//         const updatePromises = orderData.items.map(async (item) => {
+//           return await stock.findOneAndUpdate(
+//             {
+//               pID: item.product_id,
+//               "SKU.skuID": item.skuID,
+//             },
+//             {
+//               $set: {
+//                 "SKU.$.status": false, // 1. Update Status (Sold)
+//                 "SKU.$.OID": orderData.order_id, // 2. Link OID
+//               },
+//             },
+//             { new: true },
+//           );
+//         });
+
+//         await Promise.all(updatePromises);
+//         return savedOrder;
+//       } catch (err) {
+//         console.error("Stock Update Error:", err);
+//         throw err;
+//       }
+//     }
+
+//     // Save the updated order
+//     await orderData.save();
+
+//     res.status(200).json({ message: "Order updated successfully", orderData });
+//   } catch (error) {
+//     console.error("Order update error:", error);
+//     res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
 const orderUpdate = async (req, res) => {
   try {
-    // Ensure route param matches
     const { orderId } = req.params;
     const updates = req.body;
 
     if (!orderId) {
-      return res
-        .status(400)
-        .json({ message: "Order ID is required in params" });
+      return res.status(400).json({ message: "Order ID is required" });
     }
 
-    // Find order by correct DB field (replace 'order_id' if your field is different)
     const orderData = await order.findOne({ order_id: orderId });
     if (!orderData) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Update payment status if provided
-    if (updates.payment?.status) {
+    // 1. Update Payment & Status
+    if (updates.payment?.status)
       orderData.payment.status = updates.payment.status;
-    }
+    if (updates.status) orderData.status = updates.status;
 
-    // 4️⃣ Update order status if provided
-    if (updates.status) {
-      orderData.status = updates.status;
-    }
-
-    // Update items (SKU & IMEI)
+    // 2. Update Items (SKU & IMEI)
     if (updates.items && Array.isArray(updates.items)) {
       updates.items.forEach((itemUpdate) => {
         const item = orderData.items.find(
           (i) => i.product_id === itemUpdate.product_id,
         );
-
-        if (!item) return;
-
-        // Update SKU
-        if (itemUpdate.skuID !== undefined) item.skuID = itemUpdate.skuID;
-
-        // Update IMEI (single string)
-        if (itemUpdate.imei !== undefined) {
-          item.imei = itemUpdate.imei; // just store the string directly
+        if (item) {
+          if (itemUpdate.skuID !== undefined) item.skuID = itemUpdate.skuID;
+          if (itemUpdate.imei !== undefined) item.imei = itemUpdate.imei;
         }
       });
     }
 
-    // Save the updated order
-    await orderData.save();
+    // 3. Stock Update Logic (Triggered when Status becomes "Confirmed")
+    if (orderData.status === "Shipped") {
+      const numOrder = orderData.items.length || 1;
 
+      const updatePromises = orderData.items.map(async (item) => {
+        // ✅ Calculate Rounded Selling Price
+        // (Product Price - (Total Coupons + Total Discount / Number of Items))
+        const discountPortion =
+          ((orderData.coupon?.value || 0) + (orderData.discount || 0)) /
+          numOrder;
+        const finalSellingPrice = Math.round(
+          item.product_price - discountPortion,
+        );
+
+        return await stock.findOneAndUpdate(
+          {
+            pID: item.product_id,
+            "SKU.skuID": item.skuID,
+            // "SKU.status": true // Comment this out temporarily to see if it's a matching issue
+          },
+          {
+            $set: {
+              "SKU.$.status": false, // Use literal false
+              "SKU.$.OID": orderData.order_id,
+            },
+          },
+          {
+            new: true,
+            runValidators: false, // Skip validation to ensure the 'false' value is forced through
+          },
+        );
+      });
+
+      const results = await Promise.all(updatePromises);
+
+      // Check if any stock update failed (e.g., SKU already sold)
+      if (results.includes(null)) {
+        return res
+          .status(409)
+          .json({ message: "One or more SKUs are already sold or not found." });
+      }
+    }
+
+    // 4. Save and Respond
+    await orderData.save();
     res.status(200).json({ message: "Order updated successfully", orderData });
   } catch (error) {
     console.error("Order update error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    // Don't just say Internal Error, let's see the message
+    res.status(500).json({ message: error.message || "Internal Server Error" });
   }
 };
 
