@@ -15,15 +15,6 @@ const OrderItemSchema = new mongoose.Schema(
   { _id: false },
 ); // <-- disables _id for items
 
-// Schema for payment details (disable _id)
-const PaymentSchema = new mongoose.Schema(
-  {
-    method: { type: String, required: true },
-    status: { type: String, required: true },
-  },
-  { _id: false },
-);
-
 // Schema for shipping address (disable _id)
 const ShippingAddressSchema = new mongoose.Schema(
   {
@@ -44,11 +35,25 @@ const OrderSchema = new mongoose.Schema({
   customer_id: { type: String, default: "" },
   items: { type: [OrderItemSchema], required: true },
   subtotal: { type: Number, required: true },
-  shipping_cost: { type: Number, required: true },
   total_amount: { type: Number, required: true },
-  payment: { type: PaymentSchema, required: true },
   shipping_address: { type: ShippingAddressSchema, required: true },
-  status: { type: String, required: true, default: "Pending" },
+
+  courier: {
+    name: { type: String, default: "N/A" },
+    consignment_id: { type: String, default: "N/A" },
+    delivery_status: { type: String, default: "Pending" },
+    payment_status: { type: String, default: "Pending" },
+    payment_method: {
+      type: String,
+      default: "N/A",
+    },
+    del_type: { type: String, default: "COD" },
+    
+    total_cod_amount: { type: Number, default: 0, min: 0 },
+    delivery_charge: { type: Number, default: 0, min: 0 },
+    cod_fee: { type: Number, default: 0, min: 0 },
+    cod_percent: { type: Number, default: 1 },
+  },
 });
 
 // Export model
