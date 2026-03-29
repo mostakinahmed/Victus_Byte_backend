@@ -299,9 +299,9 @@ const getSmsBalance = async (req, res) => {
 const editOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const updates = req.body;
+    let updates = req.body;
 
-    // 1. Fetch the existing order to compare delivery charges
+    // 1. Fetch existing order
     const existingOrder = await order.findOne({ order_id: orderId });
 
     if (!existingOrder) {
@@ -311,37 +311,37 @@ const editOrder = async (req, res) => {
       });
     }
 
-    // 2. Identify the incoming and current delivery charges
-    // Note: We use the dot notation key because that's what the frontend sends
-    const incomingDeliveryCharge = Number(updates["courier.delivery_charge"]);
-    const currentDeliveryCharge = Number(existingOrder.courier.delivery_charge);
+    // 2. Financial Sync Logic
+    // We check if the incoming update contains a new delivery charge
+    const incomingCharge = updates["courier.delivery_charge"];
 
-    // 3. Financial Calculation Logic
-    if (incomingDeliveryCharge !== currentDeliveryCharge) {
-      // Calculate the difference (e.g., 150 - 100 = 50 or 70 - 100 = -30)
-      const difference = incomingDeliveryCharge - currentDeliveryCharge;
-      
-      // Adjust the total_amount by the difference
-      // We add the difference directly to the current total
-      updates.total_amount = existingOrder.total_amount + difference;
+    if (incomingCharge !== undefined) {
+      const currentCharge = Number(existingOrder.courier?.delivery_charge || 0);
+      const newCharge = Number(incomingCharge);
+
+      if (newCharge !== currentCharge) {
+        // Calculate difference and adjust total_amount
+        const difference = newCharge - currentCharge;
+        updates.total_amount = Number(existingOrder.total_amount) + difference;
+      }
     }
 
-    // 4. Perform the Update
+    // 3. Perform the Update
+    // Using $set with dot notation prevents overwriting the whole 'courier' object
     const updatedOrder = await order.findOneAndUpdate(
       { order_id: orderId },
       { $set: updates },
       {
-        new: true, 
+        new: true,
         runValidators: true,
-      }
+      },
     );
 
     res.status(200).json({
       success: true,
-      message: "Order & Financials updated successfully",
+      message: "Victus Byte: Order & Financials synced",
       data: updatedOrder,
     });
-
   } catch (error) {
     console.error("Victus Byte Financial Sync Error:", error.message);
     res.status(500).json({
