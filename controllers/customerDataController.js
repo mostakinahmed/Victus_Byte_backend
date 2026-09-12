@@ -534,7 +534,8 @@ const myOrder = async (req, res) => {
 
       // --- Task: Order Found ---
       const statusMap = ["Pending", "Confirmed", "Shipped", "Completed"];
-      const statusIndex = statusMap.indexOf(order.status);
+      //const statusIndex = statusMap.indexOf(order.status);
+      const statusIndex = statusMap.indexOf(order?.courier?.delivery_status);
 
       return res.status(200).json({
         success: true,
